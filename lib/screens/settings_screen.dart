@@ -1,0 +1,314 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:task_tracker/models/preset_task.dart';
+import 'package:task_tracker/providers/task_provider.dart';
+import 'package:task_tracker/screens/manage_employees_screen.dart';
+import 'package:task_tracker/screens/preset_items_screen.dart';
+import 'package:task_tracker/services/settings_service.dart';
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsService>();
+    final t = settings.t;
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: const BackButton(),
+        title: Text(t('settings')),
+      ),
+      body: ListView(
+        children: [
+          _section(t('language')),
+          ListTile(
+            title: const Text('English'),
+            trailing: settings.language == 'en'
+                ? Icon(Icons.check, color: settings.accentColor)
+                : null,
+            onTap: () => settings.setLanguage('en'),
+          ),
+          ListTile(
+            title: const Text('Français'),
+            trailing: settings.language == 'fr'
+                ? Icon(Icons.check, color: settings.accentColor)
+                : null,
+            onTap: () => settings.setLanguage('fr'),
+          ),
+          ListTile(
+            title: const Text('العربية'),
+            trailing: settings.language == 'ar'
+                ? Icon(Icons.check, color: settings.accentColor)
+                : null,
+            onTap: () => settings.setLanguage('ar'),
+          ),
+          const Divider(),
+          _section(t('theme')),
+          ListTile(
+            title: Text(t('light')),
+            trailing: settings.themeMode == ThemeMode.light
+                ? Icon(Icons.check, color: settings.accentColor)
+                : null,
+            onTap: () => settings.setThemeMode(ThemeMode.light),
+          ),
+          ListTile(
+            title: Text(t('dark')),
+            trailing: settings.themeMode == ThemeMode.dark
+                ? Icon(Icons.check, color: settings.accentColor)
+                : null,
+            onTap: () => settings.setThemeMode(ThemeMode.dark),
+          ),
+          const Divider(),
+          _section(t('accent_color')),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                Colors.indigo,
+                Colors.blue,
+                Colors.teal,
+                Colors.green,
+                Colors.orange,
+                Colors.deepPurple,
+                Colors.pink,
+                Colors.red,
+              ].map((c) {
+                final isSelected = settings.accentColor == c;
+                return GestureDetector(
+                  onTap: () => settings.setAccentColor(c),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: c,
+                      shape: BoxShape.circle,
+                      border: isSelected
+                          ? Border.all(color: Colors.white, width: 3)
+                          : null,
+                      boxShadow: isSelected
+                          ? [BoxShadow(color: c.withAlpha(128), blurRadius: 8)]
+                          : null,
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, color: Colors.white, size: 20)
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const Divider(),
+          _section(t('accounts')),
+          ...settings.rememberedAccounts.map((a) => ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: Text(a['name'] ?? ''),
+                subtitle: Text(a['email'] ?? ''),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: Text(t('delete_account')),
+                        content: Text(t('confirm_delete_account')),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: Text(t('cancel')),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: Text(t('delete')),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await settings.removeAccount(a['email']!);
+                    }
+                  },
+                ),
+              )),
+          const Divider(),
+          _section(t('data')),
+          ListTile(
+            leading: const Icon(Icons.file_download_outlined),
+            title: Text(t('export_data')),
+            onTap: () async {
+              final tp = context.read<TaskProvider>();
+              await tp.exportToClipboard();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(t('exported'))),
+                );
+              }
+            },
+          ),
+          if (settings.currentRole == 'manager') ...[
+            const Divider(),
+            _section(t('manage_employees')),
+            ListTile(
+              leading: const Icon(Icons.people_outline),
+              title: Text(t('manage_employees')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ManageEmployeesScreen()),
+              ),
+            ),
+            const Divider(),
+            _section(t('manage_items')),
+            ListTile(
+              leading: const Icon(Icons.list_alt),
+              title: Text(t('manage_items')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PresetItemsScreen()),
+              ),
+            ),
+            const Divider(),
+            _section(t('preset_tasks')),
+            _PresetManager(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _section(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(title,
+          style: const TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+    );
+  }
+}
+
+class _PresetManager extends StatefulWidget {
+  @override
+  State<_PresetManager> createState() => _PresetManagerState();
+}
+
+class _PresetManagerState extends State<_PresetManager> {
+  void _addPreset() {
+    showDialog(
+      context: context,
+      builder: (ctx) => const _AddPresetDialog(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final presets = context.watch<TaskProvider>().presets;
+    return Column(
+      children: [
+        ...presets.map((p) => ListTile(
+              title: Text(p.name),
+              subtitle: p.defaultDescription != null
+                  ? Text(p.defaultDescription!,
+                      maxLines: 1, overflow: TextOverflow.ellipsis)
+                  : null,
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                onPressed: () =>
+                    context.read<TaskProvider>().deletePreset(p.id),
+              ),
+            )),
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: OutlinedButton.icon(
+            onPressed: _addPreset,
+            icon: const Icon(Icons.add),
+            label: Text(context.read<SettingsService>().t('new_preset')),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddPresetDialog extends StatefulWidget {
+  const _AddPresetDialog();
+
+  @override
+  State<_AddPresetDialog> createState() => _AddPresetDialogState();
+}
+
+class _AddPresetDialogState extends State<_AddPresetDialog> {
+  final _nameCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  bool _reqCar = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.read<SettingsService>().t;
+    return AlertDialog(
+      title: Text(t('new_preset')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: InputDecoration(
+                labelText: t('preset_name'),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _descCtrl,
+              decoration: InputDecoration(
+                labelText: t('default_desc'),
+                border: const OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            CheckboxListTile(
+              value: _reqCar,
+              onChanged: (v) => setState(() => _reqCar = v ?? false),
+              title: Text(t('req_car')),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(t('cancel')),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_nameCtrl.text.trim().isEmpty) return;
+            context.read<TaskProvider>().addPreset(PresetTask(
+                  id: DateTime.now()
+                      .millisecondsSinceEpoch
+                      .toString(),
+                  name: _nameCtrl.text.trim(),
+                  defaultDescription: _descCtrl.text.trim().isEmpty
+                      ? null
+                      : _descCtrl.text.trim(),
+                  requireCarOrThing: _reqCar,
+                ));
+            Navigator.pop(context);
+          },
+          child: Text(t('save')),
+        ),
+      ],
+    );
+  }
+}
