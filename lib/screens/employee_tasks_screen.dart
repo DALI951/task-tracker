@@ -103,10 +103,34 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
       ),
       body: Column(
         children: [
-          if (!provider.connected && !provider.loading)
+          if (provider.loading && provider.error == null)
             const LinearProgressIndicator(),
-          if (provider.loading)
-            const LinearProgressIndicator(),
+          if (provider.error != null)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Card(
+                color: Colors.red.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(provider.error!,
+                            style: TextStyle(color: Colors.red.shade800)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          provider.clearError();
+                          final email = AuthService().currentUser?.email ?? '';
+                          provider.listenToEmployeeTasks(email);
+                        },
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           Expanded(
             child: filtered.isEmpty && allTasks.isEmpty
               ? Center(
@@ -118,6 +142,19 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                       const SizedBox(height: 12),
                       Text(t('no_tasks_assigned'),
                           style: TextStyle(color: Colors.grey.shade600)),
+                      if (provider.error != null) ...[
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            provider.clearError();
+                            final email =
+                                AuthService().currentUser?.email ?? '';
+                            provider.listenToEmployeeTasks(email);
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
+                      ],
                     ],
                   ),
                 )

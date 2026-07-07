@@ -126,11 +126,17 @@ class TaskProvider extends ChangeNotifier {
 
   void listenToEmployeeTasks(String email) {
     _taskSub?.cancel();
-    _loading = true;
+    _loading = email.isNotEmpty;
     _connected = false;
     _tasks = [];
     _error = null;
     notifyListeners();
+    if (email.isEmpty) {
+      _loading = false;
+      _error = 'No user email found';
+      notifyListeners();
+      return;
+    }
     _taskSub = _firestore.tasksForEmployee(email).listen(
       (snapshot) {
         _tasks = _sortTasks(snapshot.docs.map((doc) {
