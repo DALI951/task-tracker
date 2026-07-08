@@ -18,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _loading = false;
-  bool _isSignUp = false;
   bool _showPass = false;
 
   String t(String key) => context.read<SettingsService>().t(key);
@@ -27,9 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      final cred = _isSignUp
-          ? await _auth.signUp(_emailCtrl.text.trim(), _passwordCtrl.text)
-          : await _auth.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
+      final cred = await _auth.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
       final user = cred.user;
       if (user != null && mounted) {
         await context.read<SettingsService>().addAccount(
@@ -201,18 +198,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2),
                           )
-                        : Text(_isSignUp
-                            ? settings.t('sign_up')
-                            : settings.t('sign_in')),
+                        : Text(settings.t('sign_in')),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () =>
-                      setState(() => _isSignUp = !_isSignUp),
-                  child: Text(_isSignUp
-                      ? settings.t('has_account')
-                      : settings.t('no_account')),
                 ),
               ],
             ),
