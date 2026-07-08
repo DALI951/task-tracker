@@ -103,7 +103,7 @@ class TaskCard extends StatelessWidget {
               ),
               if (task.photoUrl != null)
                 Padding(
-                  padding: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsetsDirectional.only(start: 8),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.memory(

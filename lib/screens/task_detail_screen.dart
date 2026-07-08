@@ -227,9 +227,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
               ),
             ),
-            Positioned(
+            PositionedDirectional(
               top: 40,
-              right: 16,
+              end: 16,
               child: IconButton(
                 icon: const Icon(Icons.close, color: Colors.white),
                 onPressed: () => Navigator.pop(ctx),

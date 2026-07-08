@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/firebase_options.dart';
 import 'package:task_tracker/providers/task_provider.dart';
@@ -64,7 +65,13 @@ class _AppWithSettings extends StatelessWidget {
         Locale('fr'),
         Locale('ar'),
       ],
+      localeResolutionCallback: (locale, supported) {
+        if (locale != null && supported.contains(locale)) return locale;
+        return const Locale('en');
+      },
       localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
         DefaultMaterialLocalizations.delegate,
         DefaultWidgetsLocalizations.delegate,
       ],

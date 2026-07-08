@@ -438,7 +438,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
   Widget _statCard(String label, String value, Color color) {
     return Container(
       width: 100,
-      margin: const EdgeInsets.only(right: 8),
+      margin: const EdgeInsetsDirectional.only(end: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: color.withAlpha(25),
