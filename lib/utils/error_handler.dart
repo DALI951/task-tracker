@@ -9,6 +9,7 @@ String friendlyError(dynamic e) {
       case 'weak-password': return 'Password too weak (min 6 characters)';
       case 'user-not-found': return 'No account found with this email';
       case 'wrong-password': return 'Wrong password';
+      case 'invalid-credential': return 'Invalid email or password';
       case 'too-many-requests': return 'Too many attempts. Try again later';
       case 'network-request-failed': return 'Network error. Check connection';
     }
