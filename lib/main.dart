@@ -92,9 +92,26 @@ class _AppWithSettings extends StatelessWidget {
         ),
       ),
       darkTheme: ThemeData(
-        colorSchemeSeed: settings.accentColor,
         useMaterial3: true,
         brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: settings.accentColor,
+          brightness: Brightness.dark,
+        ).copyWith(
+          surface: const Color(0xFF1C1B1F),
+          surfaceContainerLowest: const Color(0xFF0F0D11),
+          surfaceContainerLow: const Color(0xFF1A181C),
+          surfaceContainer: const Color(0xFF1E1C20),
+          surfaceContainerHigh: const Color(0xFF28262B),
+          surfaceContainerHighest: const Color(0xFF333036),
+          onSurface: const Color(0xFFE6E1E5),
+          onSurfaceVariant: const Color(0xFFCAC4D0),
+          background: const Color(0xFF1C1B1F),
+          onBackground: const Color(0xFFE6E1E5),
+          surfaceTint: const Color(0xFF1C1B1F),
+          outline: const Color(0xFF938F99),
+          outlineVariant: const Color(0xFF49454F),
+        ),
         cardTheme: CardThemeData(
           elevation: 0,
           shape: RoundedRectangleBorder(
