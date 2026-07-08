@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/screens/manage_employees_screen.dart';
@@ -322,14 +323,30 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     final problemCount = provider.problems.where((p) => p.status == 'open' || p.status == 'assigned').length;
 
     if (filtered.isEmpty && allTasks.isEmpty) {
+      final cs = Theme.of(context).colorScheme;
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withAlpha(100),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(Icons.inbox, size: 36, color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
             Text(t('no_tasks'),
-                style: TextStyle(color: Colors.grey.shade600)),
+                style: TextStyle(
+                    fontSize: 16, color: cs.onSurfaceVariant)),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: _showCreateTaskDialog,
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(t('create_first_task')),
+            ),
           ],
         ),
       );
@@ -364,9 +381,6 @@ class _ManagerDashboardState extends State<ManagerDashboard>
             decoration: InputDecoration(
               hintText: t('search'),
               prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
               contentPadding: const EdgeInsets.symmetric(vertical: 0),
               isDense: true,
             ),
@@ -393,9 +407,16 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                 ),
               ),
               const Spacer(),
-              Text(
-                '${allTasks.where((t) => !t.isCompleted).length} ${t('tasks_pending')}',
-                style: TextStyle(color: Colors.orange.shade700, fontSize: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Brand.pending.withAlpha(15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${allTasks.where((t) => !t.isCompleted).length} ${t('tasks_pending')}',
+                  style: TextStyle(color: Brand.pending, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
@@ -403,8 +424,15 @@ class _ManagerDashboardState extends State<ManagerDashboard>
         if (filtered.isEmpty)
           Expanded(
             child: Center(
-              child: Text(t('no_tasks'),
-                  style: TextStyle(color: Colors.grey.shade600)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.search_off, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  const SizedBox(height: 8),
+                  Text(t('no_tasks'),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ],
+              ),
             ),
           )
         else
@@ -439,11 +467,11 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     return Container(
       width: 100,
       margin: const EdgeInsetsDirectional.only(end: 8),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withAlpha(25),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withAlpha(60)),
+        color: color.withAlpha(20),
+        borderRadius: BorderRadius.circular(Brand.radiusMd),
+        border: Border.all(color: color.withAlpha(50)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -451,8 +479,9 @@ class _ManagerDashboardState extends State<ManagerDashboard>
           Text(value,
               style: TextStyle(
                   fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(height: 2),
           Text(label,
-              style: TextStyle(fontSize: 11, color: color),
+              style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
               overflow: TextOverflow.ellipsis),
         ],
       ),

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:task_tracker/config/brand.dart';
 
 class SettingsService extends ChangeNotifier {
   String _language = 'en';
   ThemeMode _themeMode = ThemeMode.light;
-  Color _accentColor = Colors.indigo;
+  Color _accentColor = Brand.primary;
   List<Map<String, String>> _rememberedAccounts = [];
   String _currentRole = '';
 
@@ -28,7 +29,7 @@ class SettingsService extends ChangeNotifier {
     _language = prefs.getString(_langKey) ?? 'en';
     final themeStr = prefs.getString(_themeKey) ?? 'light';
     _themeMode = themeStr == 'dark' ? ThemeMode.dark : ThemeMode.light;
-    final accentStr = prefs.getInt(_accentKey) ?? Colors.indigo.toARGB32();
+    final accentStr = prefs.getInt(_accentKey) ?? Brand.primary.toARGB32();
     _accentColor = Color(accentStr);
     final accountsJson = prefs.getString(_accountsKey);
     if (accountsJson != null) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
@@ -63,6 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsService>();
     final accounts = settings.rememberedAccounts;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: Center(
@@ -73,51 +75,89 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.assignment, size: 64, color: Theme.of(context).primaryColor),
-                const SizedBox(height: 8),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(Icons.assignment,
+                      size: 40, color: cs.onPrimaryContainer),
+                ),
+                const SizedBox(height: 16),
                 Text(
                   settings.t('app_name'),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: cs.onSurface,
                       ),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  settings.t('select_role'),
+                  style: TextStyle(color: cs.onSurfaceVariant),
+                ),
                 if (accounts.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(settings.t('remembered_accounts'),
-                      style: TextStyle(color: Colors.grey.shade600)),
-                  const SizedBox(height: 8),
-                  ...accounts.take(3).map((a) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: InkWell(
-                          onTap: () => _loginAs(a['email']!),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.person_outline,
-                                    size: 20, color: Colors.grey.shade500),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(a['name'] ?? a['email'] ?? '',
-                                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest.withAlpha(80),
+                      borderRadius: BorderRadius.circular(Brand.radiusMd),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(settings.t('remembered_accounts'),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: cs.onSurfaceVariant,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        ...accounts.take(3).map((a) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: InkWell(
+                                onTap: () => _loginAs(a['email']!),
+                                borderRadius: BorderRadius.circular(Brand.radiusSm),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: cs.surface,
+                                    border: Border.all(color: cs.outlineVariant),
+                                    borderRadius:
+                                        BorderRadius.circular(Brand.radiusSm),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.person_outline,
+                                          size: 18, color: cs.onSurfaceVariant),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          a['name'] ?? a['email'] ?? '',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                      InkWell(
+                                        onTap: () async {
+                                          await settings
+                                              .removeAccount(a['email']!);
+                                        },
+                                        child: Icon(Icons.close,
+                                            size: 16, color: cs.outline),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                InkWell(
-                                  onTap: () async {
-                                    await settings.removeAccount(a['email']!);
-                                  },
-                                  child: Icon(Icons.close,
-                                      size: 16, color: Colors.grey.shade400),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      )),
+                              ),
+                            )),
+                      ],
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 24),
                 TextFormField(
@@ -125,7 +165,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: settings.t('email'),
                     prefixIcon: const Icon(Icons.email_outlined),
-                    border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) =>
@@ -137,7 +176,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: settings.t('password'),
                     prefixIcon: const Icon(Icons.lock_outlined),
-                    border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(_showPass
                           ? Icons.visibility_off
@@ -154,14 +192,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
                   child: ElevatedButton(
                     onPressed: _loading ? null : _submit,
                     child: _loading
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2),
                           )
                         : Text(_isSignUp
                             ? settings.t('sign_up')

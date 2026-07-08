@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/settings_service.dart';
@@ -56,11 +57,19 @@ class _ProblemsScreenState extends State<ProblemsScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle_outline,
-                            size: 64, color: Colors.grey.shade400),
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(100),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Icon(Icons.check_circle_outline,
+                              size: 32, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        ),
                         const SizedBox(height: 12),
                         Text(t('no_problems'),
-                            style: TextStyle(color: Colors.grey.shade600)),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                       ],
                     ),
                   )
@@ -86,10 +95,26 @@ class _ProblemCard extends StatelessWidget {
     final t = context.watch<SettingsService>().t;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
 
+    final cs = Theme.of(context).colorScheme;
+    Color statusBg, statusFg;
+    String statusLabel;
+    if (problem.isOpen) {
+      statusBg = Brand.problem.withAlpha(25);
+      statusFg = Brand.problem;
+      statusLabel = t('open');
+    } else if (problem.isAssigned) {
+      statusBg = Brand.doing.withAlpha(25);
+      statusFg = Brand.doing;
+      statusLabel = t('filter_assigned');
+    } else {
+      statusBg = Brand.done.withAlpha(25);
+      statusFg = Brand.done;
+      statusLabel = t('resolved');
+    }
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -97,66 +122,56 @@ class _ProblemCard extends StatelessWidget {
               children: [
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: problem.isOpen
-                        ? Colors.red.shade100
-                        : problem.isAssigned
-                            ? Colors.blue.shade100
-                            : Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(8),
+                    color: statusBg,
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    problem.isOpen
-                        ? t('open')
-                        : problem.isAssigned
-                            ? t('filter_assigned')
-                            : t('resolved'),
+                    statusLabel,
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: problem.isOpen
-                          ? Colors.red.shade800
-                          : problem.isAssigned
-                              ? Colors.blue.shade800
-                              : Colors.green.shade800,
+                      fontWeight: FontWeight.w700,
+                      color: statusFg,
                     ),
                   ),
                 ),
                 const Spacer(),
                 Text(
                   dateFormat.format(problem.createdAt),
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
-                Icon(Icons.person, size: 16, color: Colors.grey.shade500),
+                Icon(Icons.person, size: 16, color: cs.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Text(problem.reporterName,
-                    style: const TextStyle(fontWeight: FontWeight.w500)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w500, color: cs.onSurface)),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(problem.description, style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 6),
+            Text(problem.description,
+                style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
             if (problem.carOrThing != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Icon(Icons.directions_car,
-                      size: 14, color: Colors.grey.shade500),
+                      size: 14, color: cs.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(problem.carOrThing!,
-                      style: TextStyle(color: Colors.grey.shade600)),
+                      style: TextStyle(color: cs.onSurfaceVariant)),
                 ],
               ),
             ],
             if (problem.photoUrl != null) ...[
               const SizedBox(height: 8),
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(Brand.radiusSm),
                 child: Image.memory(
                   base64Decode(problem.photoUrl!),
                   width: double.infinity,
@@ -164,8 +179,8 @@ class _ProblemCard extends StatelessWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
                     height: 80,
-                    color: Colors.grey.shade200,
-                    child: const Center(child: Icon(Icons.broken_image)),
+                    color: cs.surfaceContainerHighest,
+                    child: Center(child: Icon(Icons.broken_image, color: cs.outline)),
                   ),
                 ),
               ),
@@ -190,10 +205,9 @@ class _ProblemCard extends StatelessWidget {
                       ? '${t('filter_assigned')} →'
                       : '${t('resolved')} ✓',
                   style: TextStyle(
-                      color: problem.isAssigned
-                          ? Colors.blue.shade600
-                          : Colors.green.shade600,
-                      fontSize: 12),
+                      color: problem.isAssigned ? Brand.doing : Brand.done,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
                 ),
               ),
           ],

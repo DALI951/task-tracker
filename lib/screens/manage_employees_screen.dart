@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
@@ -168,8 +169,24 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       appBar: AppBar(title: Text(t('manage_employees'))),
       body: employees.isEmpty
           ? Center(
-              child: Text(t('no_employees'),
-                  style: TextStyle(color: Colors.grey.shade600)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(100),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Icon(Icons.people_outline,
+                        size: 32, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(t('no_employees'),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ],
+              ),
             )
           : ListView.builder(
               itemCount: employees.length,

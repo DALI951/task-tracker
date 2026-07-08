@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
 
 class TaskCard extends StatelessWidget {
@@ -10,87 +11,92 @@ class TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Brand.radiusMd),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: Brand.cardPadding,
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
                             task.title,
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
                               decoration: task.isCompleted
                                   ? TextDecoration.lineThrough
                                   : null,
-                              color:
-                                  task.isCompleted ? Colors.grey : null,
+                              color: task.isCompleted
+                                  ? cs.outline
+                                  : cs.onSurface,
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         _statusBadge(task),
                       ],
                     ),
                     if (task.description != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
                         task.description!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade600,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Icon(Icons.person_outline,
-                            size: 14, color: Colors.grey.shade500),
+                            size: 14, color: cs.outline),
                         const SizedBox(width: 4),
                         Text(
                           task.assignedTo,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade500,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                         if (task.claimedByName != null) ...[
                           const SizedBox(width: 8),
                           Icon(Icons.person_pin,
-                              size: 14, color: Colors.orange.shade400),
+                              size: 14, color: Brand.doing),
                           const SizedBox(width: 2),
                           Text(
                             task.claimedByName!,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.orange.shade600,
+                              color: Brand.doing,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                         if (task.customer != null) ...[
                           const Spacer(),
                           Icon(Icons.business,
-                              size: 14, color: Colors.grey.shade400),
+                              size: 14, color: cs.outline),
                           const SizedBox(width: 2),
                           Flexible(
                             child: Text(
                               task.customer!,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade500,
+                                color: cs.onSurfaceVariant,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -105,7 +111,7 @@ class TaskCard extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsetsDirectional.only(start: 8),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(Brand.radiusSm),
                     child: Image.memory(
                       base64Decode(task.photoUrl!),
                       width: 48,
@@ -114,8 +120,9 @@ class TaskCard extends StatelessWidget {
                       errorBuilder: (_, __, ___) => Container(
                         width: 48,
                         height: 48,
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.broken_image, size: 24),
+                        color: cs.surfaceContainerHighest,
+                        child: Icon(Icons.broken_image,
+                            size: 24, color: cs.outline),
                       ),
                     ),
                   ),
@@ -128,69 +135,37 @@ class TaskCard extends StatelessWidget {
   }
 
   Widget _statusBadge(AppTask task) {
+    Color bg, fg;
+    String label;
     if (task.isCompleted) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.green.shade100,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          'Done',
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.green.shade800,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
-    }
-    if (task.isPendingReview) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.purple.shade100,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          'Review',
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.purple.shade800,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
-    }
-    if (task.isDoing) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.blue.shade100,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          'Doing',
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.blue.shade800,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
+      bg = Brand.done.withAlpha(25);
+      fg = Brand.done;
+      label = 'Done';
+    } else if (task.isPendingReview) {
+      bg = Brand.pendingReview.withAlpha(25);
+      fg = Brand.pendingReview;
+      label = 'Review';
+    } else if (task.isDoing) {
+      bg = Brand.doing.withAlpha(25);
+      fg = Brand.doing;
+      label = 'Doing';
+    } else {
+      bg = Brand.pending.withAlpha(25);
+      fg = Brand.pending;
+      label = 'Pending';
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.orange.shade100,
-        borderRadius: BorderRadius.circular(8),
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        'Pending',
+        label,
         style: TextStyle(
           fontSize: 11,
-          color: Colors.orange.shade800,
-          fontWeight: FontWeight.w600,
+          color: fg,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

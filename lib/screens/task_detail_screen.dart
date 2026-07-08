@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_service.dart';
@@ -307,6 +308,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final task = widget.task;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
     final userEmail = AuthService().currentUser?.email ?? '';
+    final cs = Theme.of(context).colorScheme;
 
     final canStart =
         task.isPending && !widget.isManager && task.assignedToEmail == userEmail;
@@ -345,6 +347,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
@@ -354,101 +357,88 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           decoration: task.isCompleted
                               ? TextDecoration.lineThrough
                               : null,
-                          color: task.isCompleted ? Colors.grey : null,
+                          color: task.isCompleted ? cs.outline : cs.onSurface,
                         ),
                   ),
                 ),
+                const SizedBox(width: 12),
                 _statusChip(task),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.person, size: 16, color: Colors.grey.shade500),
-                const SizedBox(width: 4),
-                Text('${t('assigned_to')}: ${task.assignedTo}'),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade500),
-                const SizedBox(width: 4),
-                Text('${t('created')}: ${dateFormat.format(task.createdAt)}'),
-              ],
-            ),
+            const SizedBox(height: 16),
+            _infoRow(context, Icons.person_outline, '${t('assigned_to')}: ${task.assignedTo}'),
+            const SizedBox(height: 6),
+            _infoRow(context, Icons.calendar_today, '${t('created')}: ${dateFormat.format(task.createdAt)}'),
             if (task.completedAt != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(Icons.check_circle_outline, size: 16, color: Colors.green.shade500),
-                  const SizedBox(width: 4),
-                  Text('${t('completed')}: ${dateFormat.format(task.completedAt!)}',
-                      style: TextStyle(color: Colors.green.shade700)),
-                ],
-              ),
+              const SizedBox(height: 6),
+              _infoRow(context, Icons.check_circle_outline, '${t('completed')}: ${dateFormat.format(task.completedAt!)}',
+                  color: Brand.done),
             ],
             if (task.claimedByName != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(Icons.person_pin, size: 16, color: Colors.orange.shade500),
-                  const SizedBox(width: 4),
-                  Text('${t('claimed_by')}: ${task.claimedByName}'),
-                ],
-              ),
+              const SizedBox(height: 6),
+              _infoRow(context, Icons.person_pin, '${t('claimed_by')}: ${task.claimedByName}',
+                  color: Brand.doing),
             ],
             if (task.rejectionReason != null) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
+                  color: Brand.problem.withAlpha(20),
+                  borderRadius: BorderRadius.circular(Brand.radiusSm),
+                  border: Border.all(color: Brand.problem.withAlpha(60)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, color: Colors.red.shade700, size: 18),
+                    Icon(Icons.info_outline, color: Brand.problem, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text('${t('rejection_reason')}: ${task.rejectionReason}',
-                          style: TextStyle(color: Colors.red.shade800)),
+                          style: TextStyle(color: Brand.problem)),
                     ),
                   ],
                 ),
               ),
             ],
             if (task.carOrThing != null) ...[
-              const SizedBox(height: 4),
-              Row(
+              const SizedBox(height: 6),
+              _infoRow(context, Icons.directions_car, '${t('car_thing')}: ${task.carOrThing}'),
+            ],
+            const SizedBox(height: 24),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withAlpha(60),
+                borderRadius: BorderRadius.circular(Brand.radiusMd),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.directions_car, size: 16, color: Colors.grey.shade500),
-                  const SizedBox(width: 4),
-                  Text('${t('car_thing')}: ${task.carOrThing}'),
+                  Text(t('description'),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600, color: cs.onSurface)),
+                  const SizedBox(height: 8),
+                  task.description != null
+                      ? Text(task.description!, style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant))
+                      : Text(t('no_description'),
+                          style: TextStyle(
+                              color: cs.onSurfaceVariant,
+                              fontStyle: FontStyle.italic)),
                 ],
               ),
-            ],
-            const SizedBox(height: 20),
-            if (task.description != null) ...[
-              Text(t('description'),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Text(task.description!, style: const TextStyle(fontSize: 15)),
-            ] else ...[
-              Text(t('no_description'),
-                  style: TextStyle(color: Colors.grey.shade500, fontStyle: FontStyle.italic)),
-            ],
+            ),
             if (task.photoUrl != null) ...[
               const SizedBox(height: 20),
               Text(t('proof_photo'),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600, color: cs.onSurface)),
               const SizedBox(height: 8),
               GestureDetector(
                 onTap: _showPhotoGallery,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(Brand.radiusMd),
                   child: Image.memory(
                     base64Decode(task.photoUrl!),
                     width: double.infinity,
@@ -456,32 +446,33 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       height: 200,
-                      color: Colors.grey.shade200,
-                      child: const Center(child: Icon(Icons.broken_image, size: 48)),
+                      color: cs.surfaceContainerHighest,
+                      child: Center(child: Icon(Icons.broken_image, size: 48, color: cs.outline)),
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 4),
               Text(t('tap_to_zoom'),
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
             ],
             if (task.history.isNotEmpty) ...[
               const SizedBox(height: 20),
               Text(t('history'),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600, color: cs.onSurface)),
               const SizedBox(height: 8),
               ...task.history.reversed.map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.circle, size: 8, color: Colors.grey.shade400),
+                    Icon(Icons.circle, size: 8, color: cs.outlineVariant),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '${_historyLabel(e.action)} ${t('by')} ${e.by}${e.detail != null && e.detail!.isNotEmpty ? ' — ${e.detail}' : ''}',
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                       ),
                     ),
                   ],
@@ -492,7 +483,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             if (canStart)
               SizedBox(
                 width: double.infinity,
-                height: 48,
                 child: ElevatedButton.icon(
                   onPressed: _claimTask,
                   icon: const Icon(Icons.play_arrow),
@@ -502,7 +492,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             if (canComplete)
               SizedBox(
                 width: double.infinity,
-                height: 48,
                 child: ElevatedButton.icon(
                   onPressed: _uploading ? null : _pickAndSubmitProof,
                   icon: _uploading
@@ -517,7 +506,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             if (canCompleteAsManager && !task.isCompleted)
               SizedBox(
                 width: double.infinity,
-                height: 48,
                 child: ElevatedButton.icon(
                   onPressed: _uploading ? null : _completeAsManager,
                   icon: _uploading
@@ -530,6 +518,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
               ),
             if (widget.isManager && task.isPendingReview) ...[
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
@@ -537,9 +526,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       height: 48,
                       child: ElevatedButton.icon(
                         onPressed: _approveTask,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                        icon: const Icon(Icons.check, color: Colors.white),
-                        label: Text(t('approve'), style: const TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Brand.done,
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.check),
+                        label: Text(t('approve')),
                       ),
                     ),
                   ),
@@ -549,7 +541,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       height: 48,
                       child: OutlinedButton.icon(
                         onPressed: _rejectWithReason,
-                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Brand.problem,
+                          side: BorderSide(color: Brand.problem.withAlpha(100)),
+                        ),
                         icon: const Icon(Icons.close),
                         label: Text(t('reject')),
                       ),
@@ -559,25 +554,26 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ],
             if (widget.isManager && !task.isCompleted && !task.isPendingReview)
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: _showReassignDialog,
-                  icon: const Icon(Icons.swap_horiz),
-                  label: Text(t('reassign')),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _showReassignDialog,
+                    icon: const Icon(Icons.swap_horiz),
+                    label: Text(t('reassign')),
+                  ),
                 ),
               ),
             if (widget.isManager)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: 12),
                 child: SizedBox(
                   width: double.infinity,
                   child: DropdownButtonFormField<String>(
                     initialValue: task.status,
                     decoration: InputDecoration(
                       labelText: t('status'),
-                      border: const OutlineInputBorder(),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       isDense: true,
                     ),
@@ -596,18 +592,32 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
               ),
             if (task.isCompleted && !widget.isManager)
-              Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.check_circle, size: 48, color: Colors.green.shade400),
-                    const SizedBox(height: 8),
-                    Text(t('task_completed'), style: TextStyle(color: Colors.green.shade700)),
-                  ],
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.check_circle, size: 48, color: Brand.done),
+                      const SizedBox(height: 8),
+                      Text(t('task_completed'), style: TextStyle(color: Brand.done)),
+                    ],
+                  ),
                 ),
               ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _infoRow(BuildContext context, IconData icon, String text, {Color? color}) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color ?? cs.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Text(text, style: TextStyle(fontSize: 14, color: color ?? cs.onSurfaceVariant)),
+      ],
     );
   }
 
@@ -626,31 +636,36 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Widget _statusChip(AppTask task) {
+    Color bg, fg;
+    IconData icon;
+    String label;
     if (task.isCompleted) {
-      return Chip(
-        label: Text(t('done')),
-        backgroundColor: Colors.green.shade100,
-        avatar: const Icon(Icons.check_circle, size: 18, color: Colors.green),
-      );
-    }
-    if (task.isPendingReview) {
-      return Chip(
-        label: Text(t('pending_review')),
-        backgroundColor: Colors.purple.shade100,
-        avatar: Icon(Icons.rate_review, size: 18, color: Colors.purple.shade700),
-      );
-    }
-    if (task.isDoing) {
-      return Chip(
-        label: Text(t('doing')),
-        backgroundColor: Colors.blue.shade100,
-        avatar: Icon(Icons.hourglass_top, size: 18, color: Colors.blue.shade700),
-      );
+      bg = Brand.done.withAlpha(25);
+      fg = Brand.done;
+      icon = Icons.check_circle;
+      label = t('done');
+    } else if (task.isPendingReview) {
+      bg = Brand.pendingReview.withAlpha(25);
+      fg = Brand.pendingReview;
+      icon = Icons.rate_review;
+      label = t('pending_review');
+    } else if (task.isDoing) {
+      bg = Brand.doing.withAlpha(25);
+      fg = Brand.doing;
+      icon = Icons.hourglass_top;
+      label = t('doing');
+    } else {
+      bg = Brand.pending.withAlpha(25);
+      fg = Brand.pending;
+      icon = Icons.hourglass_empty;
+      label = t('pending');
     }
     return Chip(
-      label: Text(t('pending')),
-      backgroundColor: Colors.orange.shade100,
-      avatar: Icon(Icons.hourglass_empty, size: 18, color: Colors.orange.shade700),
+      label: Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
+      backgroundColor: bg,
+      side: BorderSide.none,
+      avatar: Icon(icon, size: 18, color: fg),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/screens/report_problem_screen.dart';
@@ -108,26 +109,29 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
           if (provider.error != null)
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Card(
-                color: Colors.red.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(provider.error!,
-                            style: TextStyle(color: Colors.red.shade800)),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          provider.clearError();
-                          final email = AuthService().currentUser?.email ?? '';
-                          provider.listenToEmployeeTasks(email);
-                        },
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Brand.problem.withAlpha(20),
+                  borderRadius: BorderRadius.circular(Brand.radiusMd),
+                  border: Border.all(color: Brand.problem.withAlpha(50)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(provider.error!,
+                          style: TextStyle(color: Brand.problem)),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        provider.clearError();
+                        final email = AuthService().currentUser?.email ?? '';
+                        provider.listenToEmployeeTasks(email);
+                      },
+                      child: const Text('Retry'),
+
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -137,11 +141,21 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.celebration_outlined,
-                          size: 64, color: Colors.grey.shade400),
-                      const SizedBox(height: 12),
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(100),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Icon(Icons.celebration_outlined,
+                            size: 36, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 16),
                       Text(t('no_tasks_assigned'),
-                          style: TextStyle(color: Colors.grey.shade600)),
+                          style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant)),
                       if (provider.error != null) ...[
                         const SizedBox(height: 8),
                         ElevatedButton.icon(
@@ -167,9 +181,6 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                         decoration: InputDecoration(
                           hintText: t('search'),
                           prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
                           contentPadding: const EdgeInsets.symmetric(vertical: 0),
                           isDense: true,
                         ),
@@ -197,11 +208,18 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                             ),
                           ),
                           const Spacer(),
-                          Text(
-                            '${incomplete.length} ${t('tasks_pending')}',
-                            style: TextStyle(
-                                color: Colors.orange.shade700,
-                                fontWeight: FontWeight.w600, fontSize: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Brand.pending.withAlpha(15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${incomplete.length} ${t('tasks_pending')}',
+                              style: TextStyle(
+                                  color: Brand.pending,
+                                  fontWeight: FontWeight.w600, fontSize: 12),
+                            ),
                           ),
                         ],
                       ),

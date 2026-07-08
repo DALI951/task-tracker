@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/preset_task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/screens/manage_employees_screen.dart';
@@ -67,6 +68,7 @@ class SettingsScreen extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               children: [
+                Brand.primary,
                 Colors.indigo,
                 Colors.blue,
                 Colors.teal,
@@ -74,7 +76,6 @@ class SettingsScreen extends StatelessWidget {
                 Colors.orange,
                 Colors.deepPurple,
                 Colors.pink,
-                Colors.red,
               ].map((c) {
                 final isSelected = settings.accentColor == c;
                 return GestureDetector(
@@ -87,13 +88,13 @@ class SettingsScreen extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: isSelected
                           ? Border.all(color: Colors.white, width: 3)
-                          : null,
+                          : Border.all(color: c.withAlpha(60)),
                       boxShadow: isSelected
                           ? [BoxShadow(color: c.withAlpha(128), blurRadius: 8)]
                           : null,
                     ),
                     child: isSelected
-                        ? const Icon(Icons.check, color: Colors.white, size: 20)
+                        ? Icon(Icons.check, color: c.computeLuminance() > 0.5 ? Colors.black54 : Colors.white, size: 20)
                         : null,
                   ),
                 );
@@ -174,6 +175,17 @@ class SettingsScreen extends StatelessWidget {
             _section(t('preset_tasks')),
             _PresetManager(),
           ],
+          const SizedBox(height: 24),
+          Center(
+            child: Text(
+              Brand.enterpriseName,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(100),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -181,10 +193,13 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _section(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
       child: Text(title,
           style: const TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey,
+              letterSpacing: 0.5)),
     );
   }
 }
