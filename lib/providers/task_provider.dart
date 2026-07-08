@@ -443,9 +443,9 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> addEmployee(String email, String name, String createdBy) async {
+  Future<bool> addEmployee(String email, String name, String createdBy, {String? password}) async {
     try {
-      await _firestore.addEmployee(email, name, createdBy);
+      await _firestore.addEmployee(email, name, createdBy, password: password);
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -458,6 +458,17 @@ class TaskProvider extends ChangeNotifier {
     try {
       await _firestore.updateEmployee(email, {'name': newName});
       await _firestore.updateTasksByEmployee(email, {'assignedTo': newName});
+      return true;
+    } catch (e) {
+      _error = friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateEmployeeField(String email, Map<String, dynamic> data) async {
+    try {
+      await _firestore.updateEmployee(email, data);
       return true;
     } catch (e) {
       _error = friendlyError(e);

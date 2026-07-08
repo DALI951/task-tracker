@@ -26,6 +26,9 @@ ios/Flutter/Flutter.podspec
 *.xcworkspace
 *.xcuserdata
 
+# Functions
+functions/node_modules/
+
 # Web
 web/splash/
 

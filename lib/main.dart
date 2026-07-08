@@ -6,6 +6,7 @@ import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/firebase_options.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_gate.dart';
+import 'package:task_tracker/services/session_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/utils/connectivity.dart';
 import 'package:task_tracker/widgets/offline_banner.dart';
@@ -13,6 +14,7 @@ import 'package:task_tracker/widgets/offline_banner.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await SessionService().init();
   runApp(const TaskTrackerApp());
 }
 

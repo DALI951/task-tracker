@@ -16,4 +16,15 @@ class UserService {
     if (!doc.exists) return null;
     return doc.data()?['role'] as String?;
   }
+
+  Future<void> ensureManager(String uid, String email) async {
+    final doc = await _db.collection('users').doc(uid).get();
+    if (!doc.exists) {
+      await _db.collection('users').doc(uid).set({
+        'role': 'manager',
+        'email': email,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
 }

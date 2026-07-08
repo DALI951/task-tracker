@@ -64,12 +64,13 @@ class FirestoreService {
     return _presetsRef.orderBy('name').snapshots();
   }
 
-  Future<void> addEmployee(String email, String name, String createdBy) async {
+  Future<void> addEmployee(String email, String name, String createdBy, {String? password}) async {
     await _employeesRef.doc(email).set({
       'email': email,
       'name': name,
       'createdBy': createdBy,
       'createdAt': FieldValue.serverTimestamp(),
+      if (password != null) 'storedPassword': password,
     });
   }
 

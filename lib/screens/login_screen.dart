@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/services/auth_service.dart';
+import 'package:task_tracker/services/session_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -32,6 +34,11 @@ class _LoginScreenState extends State<LoginScreen> {
           : await _auth.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
       final user = cred.user;
       if (user != null && mounted) {
+        await SessionService().saveCredentials(
+          user.email ?? _emailCtrl.text.trim(),
+          _passwordCtrl.text,
+        );
+        await UserService().ensureManager(user.uid, user.email ?? _emailCtrl.text.trim());
         await context.read<SettingsService>().addAccount(
               user.email ?? _emailCtrl.text.trim(),
               user.displayName ?? _emailCtrl.text.trim(),
