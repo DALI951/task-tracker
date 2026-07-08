@@ -46,28 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _signInWithGoogle() async {
-    setState(() => _loading = true);
-    try {
-      final cred = await _auth.signInWithGoogle();
-      final user = cred.user;
-      if (user != null && mounted) {
-        await context.read<SettingsService>().addAccount(
-              user.email ?? '',
-              user.displayName ?? user.email ?? '',
-            );
-      }
-    } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
   void _loginAs(String email) {
     _emailCtrl.text = email;
     _passwordCtrl.text = '';
@@ -187,16 +165,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         : Text(_isSignUp
                             ? settings.t('sign_up')
                             : settings.t('sign_in')),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    onPressed: _loading ? null : _signInWithGoogle,
-                    icon: const Icon(Icons.g_mobiledata),
-                    label: Text(settings.t('sign_in_google')),
                   ),
                 ),
                 const SizedBox(height: 12),

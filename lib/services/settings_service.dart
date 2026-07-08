@@ -91,7 +91,7 @@ class SettingsService extends ChangeNotifier {
       'sign_in': 'Sign In',
       'sign_up': 'Sign Up',
       'sign_out': 'Sign Out',
-      'sign_in_google': 'Sign in with Google',
+
       'email': 'Email',
       'password': 'Password',
       'no_account': "Don't have an account? Create one",
@@ -217,7 +217,7 @@ class SettingsService extends ChangeNotifier {
       'sign_in': 'Connexion',
       'sign_up': "S'inscrire",
       'sign_out': 'Déconnexion',
-      'sign_in_google': 'Connexion avec Google',
+
       'email': 'Email',
       'password': 'Mot de passe',
       'no_account': 'Pas de compte? Créez-en un',
@@ -343,7 +343,7 @@ class SettingsService extends ChangeNotifier {
       'sign_in': 'تسجيل الدخول',
       'sign_up': 'إنشاء حساب',
       'sign_out': 'تسجيل الخروج',
-      'sign_in_google': 'تسجيل عبر Google',
+
       'email': 'البريد الإلكتروني',
       'password': 'كلمة المرور',
       'no_account': 'ليس لديك حساب؟ إنشاء واحد',
