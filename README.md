@@ -112,6 +112,7 @@ The project is already connected to Firebase project **`task-tracker-6d7e1`**.
 
 | Version | Manager APK | Employee APK | Changes |
 |---------|------------|-------------|---------|
+| v1.2.0 | [Download](releases/task-tracker-manager-v1.2.0.apk) | [Download](releases/task-tracker-employee-v1.2.0.apk) | Start Task replaces Claim Task; pull-to-refresh improvements |
 | v1.1.0 | [Download](releases/task-tracker-manager-v1.1.0.apk) | [Download](releases/task-tracker-employee-v1.1.0.apk) | Pull-to-refresh on tasks & problems; settings screen; report problem feature; custom employee icon |
 | v1.0.0 | [Download](releases/task-tracker-manager-v1.0.0.apk) | [Download](releases/task-tracker-employee-v1.0.0.apk) | Initial release |
 
@@ -200,7 +201,7 @@ task_tracker/
 
 ### Employee App (`employee/`)
 
-Separate Flutter project. Employee logs in, sees assigned tasks, takes a photo as proof of completion, submits for review. Pull down on the task list to refresh.
+Separate Flutter project. Employee logs in, sees pre-assigned tasks, taps **Start Task** to begin working, takes a photo as proof of completion, submits for review. Pull down on the task list to refresh.
 
 ---
 
@@ -291,6 +292,6 @@ After completing all setup steps above:
 3. Sign in as manager, create an employee
 4. Sign in as employee on the employee app
 5. Assign a task from the manager app
-6. Claim and complete it from the employee app (with photo)
+6. **Start Task** from the employee app, then take a photo and submit
 7. Review and approve it from the manager app
 8. File a problem report from the employee app, view it in the manager's problems tab

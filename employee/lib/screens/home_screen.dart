@@ -25,17 +25,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _claimTask(String taskId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final ok = await context.read<EmployeeState>().claimTask(
-          taskId,
-          user.email ?? '',
-          user.displayName ?? user.email ?? '',
-        );
+  void _startTask(String taskId) async {
+    final ok = await context.read<EmployeeState>().startTask(taskId);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ok ? 'Task claimed' : 'Failed to claim task')),
+        SnackBar(content: Text(ok ? 'Task started' : 'Failed to start task')),
       );
     }
   }
@@ -206,9 +200,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: () => _claimTask(task['id'] as String),
+                                      onPressed: () => _startTask(task['id'] as String),
                                       icon: const Icon(Icons.play_arrow, size: 18),
-                                      label: const Text('Claim Task'),
+                                      label: const Text('Start Task'),
                                     ),
                                   ),
                                 ],

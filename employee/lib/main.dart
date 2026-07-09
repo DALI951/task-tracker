@@ -107,12 +107,10 @@ class EmployeeState extends ChangeNotifier {
     );
   }
 
-  Future<bool> claimTask(String taskId, String userEmail, String userName) async {
+  Future<bool> startTask(String taskId) async {
     try {
       await _firestore.updateTask(taskId, {
         'status': 'doing',
-        'claimedBy': userEmail,
-        'claimedByName': userName,
       });
       return true;
     } catch (e) {

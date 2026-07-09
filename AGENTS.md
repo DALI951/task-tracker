@@ -92,6 +92,7 @@ Copy-Item ...\app-release.apk ...\releases\task-tracker-employee-v{version}.apk
 - **Delete Employee** removes Firestore doc but does NOT delete the Firebase Auth user (would need Admin SDK).
 - **Password reset** requires stored password to be current. Falls back to `sendPasswordResetEmail`.
 - **Manager APK** exceeds GitHub's recommended 50MB (actual ~55MB) — works fine but shows a warning.
+- **v1.2.0**: Removed "Claim Task" button — tasks are pre-assigned; replaced with "Start Task" which sets status to `doing` without claiming fields.
 
 ---
 
