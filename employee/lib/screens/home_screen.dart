@@ -36,7 +36,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _completeTask(String taskId) async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.camera);
+    final file = await picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 70,
+    );
     if (file == null) return;
 
     final bytes = await File(file.path).readAsBytes();

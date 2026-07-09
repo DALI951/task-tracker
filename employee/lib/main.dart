@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -70,18 +71,20 @@ class EmployeeState extends ChangeNotifier {
   List<Map<String, dynamic>> _tasks = [];
   bool _loading = true;
   String? _error;
+  StreamSubscription? _tasksSub;
 
   List<Map<String, dynamic>> get tasks => _tasks;
   bool get loading => _loading;
   String? get error => _error;
 
   void listenToTasks(String email) {
+    _tasksSub?.cancel();
     _loading = true;
     _tasks = [];
     _error = null;
     notifyListeners();
 
-    _firestore.tasksForEmployee(email).listen(
+    _tasksSub = _firestore.tasksForEmployee(email).listen(
       (snapshot) {
         _tasks = snapshot.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
@@ -112,6 +115,11 @@ class EmployeeState extends ChangeNotifier {
       await _firestore.updateTask(taskId, {
         'status': 'doing',
       });
+      final idx = _tasks.indexWhere((t) => t['id'] == taskId);
+      if (idx != -1) {
+        _tasks[idx]['status'] = 'doing';
+        notifyListeners();
+      }
       return true;
     } catch (e) {
       _error = e.toString();
@@ -122,12 +130,16 @@ class EmployeeState extends ChangeNotifier {
 
   Future<bool> completeTask(String taskId, String photoBase64) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
       await _firestore.updateTask(taskId, {
         'status': 'pending_review',
         'photoUrl': photoBase64,
         'completedAt': DateTime.now(),
       });
+      final idx = _tasks.indexWhere((t) => t['id'] == taskId);
+      if (idx != -1) {
+        _tasks[idx]['status'] = 'pending_review';
+        notifyListeners();
+      }
       return true;
     } catch (e) {
       _error = e.toString();
@@ -156,6 +168,7 @@ class EmployeeState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _tasksSub?.cancel();
     super.dispose();
   }
 }

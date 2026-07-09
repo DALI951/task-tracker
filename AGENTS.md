@@ -92,7 +92,14 @@ Copy-Item ...\app-release.apk ...\releases\task-tracker-employee-v{version}.apk
 - **Delete Employee** removes Firestore doc but does NOT delete the Firebase Auth user (would need Admin SDK).
 - **Password reset** requires stored password to be current. Falls back to `sendPasswordResetEmail`.
 - **Manager APK** exceeds GitHub's recommended 50MB (actual ~55MB) — works fine but shows a warning.
-- **v1.2.0**: Removed "Claim Task" button — tasks are pre-assigned; replaced with "Start Task" which sets status to `doing` without claiming fields.
+
+## Recent Fixes
+
+### v1.2.0 fixes
+- **Replace "Claim Task" with "Start Task"** — tasks are pre-assigned, no claiming needed. Button just sets status to `doing`.
+- **Photo compression** — `pickImage` now uses `maxWidth: 1024, maxHeight: 1024, imageQuality: 70` to keep base64 under Firestore's 1MB doc limit (was causing cache corruption and crash on restart).
+- **Stream subscription leak** — `listenToTasks` now stores and cancels the previous `StreamSubscription` before creating a new one, preventing stale listeners.
+- **Optimistic UI updates** — `startTask()` and `completeTask()` immediately update the local `_tasks` list and call `notifyListeners()`, so the UI reflects the change instantly without waiting for the Firestore stream.
 
 ---
 
