@@ -16,6 +16,7 @@ android/app/build/
 android/build/
 *.apk
 *.aab
+!releases/*.apk
 local.properties
 
 # iOS
