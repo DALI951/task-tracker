@@ -16,6 +16,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  String _filter = 'all';
+
+  List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> all) {
+    if (_filter == 'all') return all;
+    return all.where((t) => (t['status'] as String? ?? 'pending') == _filter).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<EmployeeState>();
     final cs = Theme.of(context).colorScheme;
+    final filtered = _filtered(state.tasks);
 
     return Scaffold(
       appBar: AppBar(
@@ -98,16 +106,40 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: state.loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () async {
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Row(
+              children: [
+                DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _filter,
+                    isDense: true,
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('All')),
+                      DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                      DropdownMenuItem(value: 'doing', child: Text('In Progress')),
+                      DropdownMenuItem(value: 'pending_review', child: Text('Pending Review')),
+                      DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                    ],
+                    onChanged: (v) => setState(() => _filter = v ?? 'all'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: state.loading
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: () async {
                 final user = FirebaseAuth.instance.currentUser;
                 if (user?.email != null) {
                   context.read<EmployeeState>().listenToTasks(user!.email!);
                 }
               },
-              child: state.tasks.isEmpty
+              child: filtered.isEmpty
                   ? ListView(
                       children: [
                         SizedBox(
@@ -128,9 +160,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     )
                   : ListView.builder(
-                      itemCount: state.tasks.length,
-                      itemBuilder: (_, i) {
-                        final task = state.tasks[i];
+                      itemCount: filtered.length,
+                        itemBuilder: (_, i) {
+                        final task = filtered[i];
                         final status = task['status'] as String? ?? 'pending';
                         final title = task['title'] as String? ?? '';
                         final description = task['description'] as String? ?? '';
@@ -229,6 +261,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     ),
+                  ),
+                ),
+              ],
             ),
     );
   }

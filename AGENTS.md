@@ -36,6 +36,10 @@ Two Flutter apps in a monorepo:
 - Employee tasks: `RefreshIndicator` in `employee/lib/screens/home_screen.dart`
 - All refresh handlers re-subscribe to the Firestore stream.
 
+### Filters
+- Employee tasks: status filter dropdown (All / Pending / In Progress / Pending Review / Completed)
+- Problems: status filter dropdown (Open / All / Assigned / Resolved)
+
 ### Key Files
 
 #### Manager App
@@ -96,10 +100,11 @@ Copy-Item ...\app-release.apk ...\releases\task-tracker-employee-v{version}.apk
 ## Recent Fixes
 
 ### v1.2.0 fixes
-- **Replace "Claim Task" with "Start Task"** — tasks are pre-assigned, no claiming needed. Button just sets status to `doing`.
-- **Photo compression** — `pickImage` now uses `maxWidth: 1024, maxHeight: 1024, imageQuality: 70` to keep base64 under Firestore's 1MB doc limit (was causing cache corruption and crash on restart).
-- **Stream subscription leak** — `listenToTasks` now stores and cancels the previous `StreamSubscription` before creating a new one, preventing stale listeners.
-- **Optimistic UI updates** — `startTask()` and `completeTask()` immediately update the local `_tasks` list and call `notifyListeners()`, so the UI reflects the change instantly without waiting for the Firestore stream.
+- **Status filter** — added dropdown to employee app to filter tasks by status.
+- **Replace "Claim Task" with "Start Task"** — tasks are pre-assigned, no claiming needed.
+- **Photo compression** — `maxWidth: 1024, maxHeight: 1024, imageQuality: 70` to keep base64 under Firestore's 1MB limit.
+- **Stream subscription leak** — `listenToTasks` now cancels previous subscription before creating new one.
+- **Optimistic UI updates** — local state updates instantly without waiting for Firestore stream.
 
 ---
 
