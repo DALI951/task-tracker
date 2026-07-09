@@ -112,7 +112,7 @@ The project is already connected to Firebase project **`task-tracker-6d7e1`**.
 
 | Version | Manager APK | Employee APK | Changes |
 |---------|------------|-------------|---------|
-| v1.2.0 | [Download](releases/task-tracker-manager-v1.2.0.apk) | [Download](releases/task-tracker-employee-v1.2.0.apk) | Start Task replaces Claim Task; pull-to-refresh improvements |
+| v1.2.0 | [Download](releases/task-tracker-manager-v1.2.0.apk) | [Download](releases/task-tracker-employee-v1.2.0.apk) | Start Task replaces Claim Task; status filter; fix settings back button; photo compression; stream subscription fix |
 | v1.1.0 | [Download](releases/task-tracker-manager-v1.1.0.apk) | [Download](releases/task-tracker-employee-v1.1.0.apk) | Pull-to-refresh on tasks & problems; settings screen; report problem feature; custom employee icon |
 | v1.0.0 | [Download](releases/task-tracker-manager-v1.0.0.apk) | [Download](releases/task-tracker-employee-v1.0.0.apk) | Initial release |
 

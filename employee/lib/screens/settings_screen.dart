@@ -27,8 +27,11 @@ class SettingsScreen extends StatelessWidget {
                   title: const Text('Dark Mode'),
                   subtitle: const Text('Toggle dark / light theme'),
                   value: settings.themeMode == ThemeMode.dark,
-                  onChanged: (v) => settings.setThemeMode(
-                      v ? ThemeMode.dark : ThemeMode.light),
+                  onChanged: (v) async {
+                    await settings.setThemeMode(
+                        v ? ThemeMode.dark : ThemeMode.light);
+                    if (context.mounted) Navigator.pop(context);
+                  },
                 ),
               ],
             ),
@@ -45,24 +48,33 @@ class SettingsScreen extends StatelessWidget {
                   title: const Text('English'),
                   value: 'en',
                   groupValue: settings.language,
-                  onChanged: (v) {
-                    if (v != null) settings.setLanguage(v);
+                  onChanged: (v) async {
+                    if (v != null) {
+                      await settings.setLanguage(v);
+                      if (context.mounted) Navigator.pop(context);
+                    }
                   },
                 ),
                 RadioListTile<String>(
                   title: const Text('Français'),
                   value: 'fr',
                   groupValue: settings.language,
-                  onChanged: (v) {
-                    if (v != null) settings.setLanguage(v);
+                  onChanged: (v) async {
+                    if (v != null) {
+                      await settings.setLanguage(v);
+                      if (context.mounted) Navigator.pop(context);
+                    }
                   },
                 ),
                 RadioListTile<String>(
                   title: const Text('العربية'),
                   value: 'ar',
                   groupValue: settings.language,
-                  onChanged: (v) {
-                    if (v != null) settings.setLanguage(v);
+                  onChanged: (v) async {
+                    if (v != null) {
+                      await settings.setLanguage(v);
+                      if (context.mounted) Navigator.pop(context);
+                    }
                   },
                 ),
               ],

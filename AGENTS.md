@@ -100,6 +100,7 @@ Copy-Item ...\app-release.apk ...\releases\task-tracker-employee-v{version}.apk
 ## Recent Fixes
 
 ### v1.2.0 fixes
+- **Settings back button fix** — `MaterialApp` was rebuilding on language/theme change, losing navigation state. Now the Settings screen pops after changing these settings so the user sees the result immediately.
 - **Status filter** — added dropdown to employee app to filter tasks by status.
 - **Replace "Claim Task" with "Start Task"** — tasks are pre-assigned, no claiming needed.
 - **Photo compression** — `maxWidth: 1024, maxHeight: 1024, imageQuality: 70` to keep base64 under Firestore's 1MB limit.
