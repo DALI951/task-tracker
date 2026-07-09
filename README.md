@@ -108,31 +108,38 @@ The project is already connected to Firebase project **`task-tracker-6d7e1`**.
 3. Download `google-services.json` → replace `android/app/google-services.json`
 4. Replace `lib/firebase_options.dart` via `flutterfire configure`
 
+## Releases
+
+| Version | Manager APK | Employee APK | Changes |
+|---------|------------|-------------|---------|
+| v1.1.0 | [Download](releases/task-tracker-manager-v1.1.0.apk) | [Download](releases/task-tracker-employee-v1.1.0.apk) | Pull-to-refresh on tasks & problems; settings screen; report problem feature; custom employee icon |
+| v1.0.0 | [Download](releases/task-tracker-manager-v1.0.0.apk) | [Download](releases/task-tracker-employee-v1.0.0.apk) | Initial release |
+
 ---
 
 ## Project Structure
 
 ```
 task_tracker/
-├── lib/
+├── lib/                          # Manager app source
 │   ├── main.dart                    # App entry point
 │   ├── config/
 │   │   └── brand.dart               # Colors, spacing constants
 │   ├── screens/
 │   │   ├── login_screen.dart         # Sign-in / sign-up
-│   │   ├── home_screen.dart          # Main manager dashboard
+│   │   ├── manager_dashboard.dart    # Main manager dashboard (tasks + problems tabs)
 │   │   ├── manage_employees_screen.dart  # Create/rename/delete/reset-password
 │   │   ├── assign_tasks_screen.dart  # Assign preset items to employees
-│   │   └── review_screen.dart        # Review completed tasks with photos
+│   │   ├── problems_screen.dart      # View & convert reported problems
+│   │   └── settings_screen.dart      # Language, theme
 │   ├── providers/
 │   │   └── task_provider.dart        # State management (ChangeNotifier)
 │   ├── services/
 │   │   ├── auth_service.dart         # Firebase Auth wrapper
 │   │   ├── auth_gate.dart            # Auth state listener → routes to login/dashboard
-│   │   ├── session_service.dart      # Persists manager credentials (flutter_secure_storage)
+│   │   ├── session_service.dart      # Persists manager credentials (shared_preferences)
 │   │   ├── firestore_service.dart    # Firestore CRUD operations
-│   │   ├── user_service.dart         # User role management
-│   │   └── settings_service.dart     # Language, theme, remembered accounts
+│   │   └── settings_service.dart     # Language, theme
 │   ├── utils/
 │   │   ├── error_handler.dart        # Friendly error messages
 │   │   └── connectivity.dart         # Online/offline detection
@@ -140,16 +147,33 @@ task_tracker/
 │       ├── offline_banner.dart        # Shows "No internet" bar
 │       ├── options_bottom_sheet.dart
 │       ├── photo_preview_dialog.dart
-│       ├── tab_indicator.dart
 │       ├── task_card.dart
 │       └── task_item.dart
+├── employee/                      # Employee app (separate Flutter project)
+│   ├── lib/
+│   │   ├── main.dart
+│   │   ├── screens/
+│   │   │   ├── login_screen.dart
+│   │   │   ├── home_screen.dart
+│   │   │   ├── report_problem_screen.dart
+│   │   │   └── settings_screen.dart
+│   │   └── services/
+│   │       ├── firestore_service.dart
+│   │       └── settings_service.dart
+│   └── pubspec.yaml
 ├── functions/                        # Cloud Functions (optional, see below)
 │   ├── package.json
 │   └── index.js
+├── releases/                         # Pre-built APKs
+│   ├── task-tracker-manager-v1.1.0.apk
+│   ├── task-tracker-manager-v1.0.0.apk
+│   ├── task-tracker-employee-v1.1.0.apk
+│   └── task-tracker-employee-v1.0.0.apk
 ├── firebase.json                     # Firebase project config
 ├── .firebaserc                       # Default project: task-tracker-6d7e1
 ├── firestore.rules                   # Firestore security rules
-└── pubspec.yaml
+├── pubspec.yaml                      # Manager app dependencies
+└── README.md
 ```
 
 ---
@@ -167,15 +191,16 @@ task_tracker/
    - **Delete** — removes `employees/{email}` doc (does NOT delete Firebase Auth user).
    - **Reset Password** — signs in briefly as the employee using the stored password, calls `updatePassword()`, signs back in as manager.
 
-3. **Assign Tasks** (`assign_tasks_screen.dart`):
-   - Pick an employee, check preset items, optionally add custom text → creates `tasks/{taskId}` in Firestore.
+3. **Problems** (`problems_screen.dart`):
+   - View reported problems with status filter (open / all / assigned / resolved)
+   - Pull down to refresh the list
+   - Convert open problems into tasks assigned to employees
 
-4. **Review** (`review_screen.dart`):
-   - View completed tasks with photos. Approve or reject with a reason.
+4. **Settings** (`settings_screen.dart`):
 
-### Employee App (`task_tracker_employee`)
+### Employee App (`employee/`)
 
-Separate Flutter project. Employee logs in, sees assigned tasks, takes a photo as proof of completion, submits for review.
+Separate Flutter project. Employee logs in, sees assigned tasks, takes a photo as proof of completion, submits for review. Pull down on the task list to refresh.
 
 ---
 
@@ -183,7 +208,7 @@ Separate Flutter project. Employee logs in, sees assigned tasks, takes a photo a
 
 ### Session Service (`lib/services/session_service.dart`)
 
-Managers need to re-authenticate after employee creation (because Firebase `createUserWithEmailAndPassword` signs in as the **new** user). The session service persists the manager's email + password in `flutter_secure_storage` so re-auth happens automatically.
+Managers need to re-authenticate after employee creation (because Firebase `createUserWithEmailAndPassword` signs in as the **new** user). The session service persists the manager's email + password in `shared_preferences` so re-auth happens automatically.
 
 - `init()` — called in `main.dart` to load from disk
 - `saveCredentials()` — called on login
@@ -195,24 +220,38 @@ The most complex screen. Key methods:
 - `_addEmployee()` — shows dialog → calls Firebase Auth → re-auth → writes Firestore
 - `_resolveExistingAccount()` — handles email-already-in-use (Replace / Link)
 - `_resetPassword()` — brief sign-in as employee → `updatePassword()` → sign back in
-- `_getManagerCreds()` — reads from `SessionService()`
+- `_ensureManagerPass()` — caches manager's password in memory (prompted once per session)
 
 ### Stream-based reactivity
 
 `TaskProvider` listens to Firestore streams for tasks, employees, and preset items. Changes propagate automatically via `notifyListeners()`.
+
+### Pull-to-Refresh
+
+Three screens have `RefreshIndicator`:
+- **Manager tasks tab** — `manager_dashboard.dart` wraps task list
+- **Problems screen** — `problems_screen.dart` wraps problem list
+- **Employee tasks** — `employee/lib/screens/home_screen.dart` wraps task list
+
+All re-subscribe to their Firestore stream on pull-down.
 
 ---
 
 ## Build & Run
 
 ```powershell
-# Debug build
-flutter build apk --debug
-flutter install --debug
+# Manager app (from root)
+flutter build apk --release   # Output: build/app/outputs/flutter-apk/app-release.apk
 
-# Release build (requires signing key)
-flutter build apk --release
+# Employee app (from employee/)
+cd employee
+flutter build apk --release   # Output: build/app/outputs/flutter-apk/app-release.apk
+
+# Install on connected device
+flutter install
 ```
+
+Release APKs are copied to `releases/` with versioned names.
 
 ---
 
@@ -247,10 +286,11 @@ After deployment, you can:
 
 After completing all setup steps above:
 
-1. Run `flutter pub get` in both `task_tracker` and `task_tracker_employee`
-2. Build and install both apps: `flutter build apk --debug` + `flutter install --debug`
+1. Run `flutter pub get` in both the root and `employee/` directories
+2. Build and install both apps: `flutter build apk --release` then `flutter install`
 3. Sign in as manager, create an employee
 4. Sign in as employee on the employee app
 5. Assign a task from the manager app
 6. Claim and complete it from the employee app (with photo)
-7. Review it from the manager app
+7. Review and approve it from the manager app
+8. File a problem report from the employee app, view it in the manager's problems tab

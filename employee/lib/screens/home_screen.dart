@@ -101,121 +101,136 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: state.loading
           ? const Center(child: CircularProgressIndicator())
-          : state.tasks.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.task_alt,
-                          size: 64, color: cs.onSurfaceVariant.withAlpha(100)),
-                      const SizedBox(height: 12),
-                      Text('No tasks assigned',
-                          style: TextStyle(color: cs.onSurfaceVariant)),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: state.tasks.length,
-                  itemBuilder: (_, i) {
-                    final task = state.tasks[i];
-                    final status = task['status'] as String? ?? 'pending';
-                    final title = task['title'] as String? ?? '';
-                    final description = task['description'] as String? ?? '';
-                    final assignedTo = task['assignedTo'] as String? ?? '';
-
-                    Color statusColor;
-                    String statusLabel;
-                    switch (status) {
-                      case 'doing':
-                        statusColor = Colors.orange;
-                        statusLabel = 'In Progress';
-                      case 'pending_review':
-                        statusColor = Colors.blue;
-                        statusLabel = 'Pending Review';
-                      case 'completed':
-                        statusColor = Colors.green;
-                        statusLabel = 'Completed';
-                      default:
-                        statusColor = Colors.grey;
-                        statusLabel = 'Pending';
-                    }
-
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(title,
-                                      style:
-                                          const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withAlpha(30),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(statusLabel,
-                                      style: TextStyle(
-                                          color: statusColor, fontSize: 12)),
-                                ),
-                              ],
-                            ),
-                            if (description.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(description,
-                                  style: TextStyle(
-                                      color: cs.onSurfaceVariant,
-                                      fontSize: 14)),
-                            ],
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(Icons.person_outline,
-                                    size: 16, color: cs.onSurfaceVariant),
-                                const SizedBox(width: 4),
-                                Text(assignedTo,
-                                    style: TextStyle(
-                                        color: cs.onSurfaceVariant,
-                                        fontSize: 13)),
-                              ],
-                            ),
-                            if (status == 'pending') ...[
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: () => _claimTask(task['id'] as String),
-                                  icon: const Icon(Icons.play_arrow, size: 18),
-                                  label: const Text('Claim Task'),
-                                ),
-                              ),
-                            ],
-                            if (status == 'doing') ...[
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: () =>
-                                      _completeTask(task['id'] as String),
-                                  icon: const Icon(Icons.camera_alt, size: 18),
-                                  label: const Text('Take Photo & Complete'),
-                                ),
-                              ),
-                            ],
-                          ],
+          : RefreshIndicator(
+              onRefresh: () async {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user?.email != null) {
+                  context.read<EmployeeState>().listenToTasks(user!.email!);
+                }
+              },
+              child: state.tasks.isEmpty
+                  ? ListView(
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.3,
                         ),
-                      ),
-                    );
-                  },
-                ),
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.task_alt,
+                                  size: 64, color: cs.onSurfaceVariant.withAlpha(100)),
+                              const SizedBox(height: 12),
+                              Text('No tasks assigned',
+                                  style: TextStyle(color: cs.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : ListView.builder(
+                      itemCount: state.tasks.length,
+                      itemBuilder: (_, i) {
+                        final task = state.tasks[i];
+                        final status = task['status'] as String? ?? 'pending';
+                        final title = task['title'] as String? ?? '';
+                        final description = task['description'] as String? ?? '';
+                        final assignedTo = task['assignedTo'] as String? ?? '';
+
+                        Color statusColor;
+                        String statusLabel;
+                        switch (status) {
+                          case 'doing':
+                            statusColor = Colors.orange;
+                            statusLabel = 'In Progress';
+                          case 'pending_review':
+                            statusColor = Colors.blue;
+                            statusLabel = 'Pending Review';
+                          case 'completed':
+                            statusColor = Colors.green;
+                            statusLabel = 'Completed';
+                          default:
+                            statusColor = Colors.grey;
+                            statusLabel = 'Pending';
+                        }
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(title,
+                                          style:
+                                              const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withAlpha(30),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(statusLabel,
+                                          style: TextStyle(
+                                              color: statusColor, fontSize: 12)),
+                                    ),
+                                  ],
+                                ),
+                                if (description.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(description,
+                                      style: TextStyle(
+                                          color: cs.onSurfaceVariant,
+                                          fontSize: 14)),
+                                ],
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(Icons.person_outline,
+                                        size: 16, color: cs.onSurfaceVariant),
+                                    const SizedBox(width: 4),
+                                    Text(assignedTo,
+                                        style: TextStyle(
+                                            color: cs.onSurfaceVariant,
+                                            fontSize: 13)),
+                                  ],
+                                ),
+                                if (status == 'pending') ...[
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => _claimTask(task['id'] as String),
+                                      icon: const Icon(Icons.play_arrow, size: 18),
+                                      label: const Text('Claim Task'),
+                                    ),
+                                  ),
+                                ],
+                                if (status == 'doing') ...[
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () =>
+                                          _completeTask(task['id'] as String),
+                                      icon: const Icon(Icons.camera_alt, size: 18),
+                                      label: const Text('Take Photo & Complete'),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
     );
   }
 }

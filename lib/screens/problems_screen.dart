@@ -52,33 +52,45 @@ class _ProblemsScreenState extends State<ProblemsScreen> {
             ),
           ),
           Expanded(
-            child: problems.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+            child: RefreshIndicator(
+              onRefresh: () async {
+                context.read<TaskProvider>().listenToProblems();
+              },
+              child: problems.isEmpty
+                  ? ListView(
                       children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(100),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Icon(Icons.check_circle_outline,
-                              size: 32, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.25,
                         ),
-                        const SizedBox(height: 12),
-                        Text(t('no_problems'),
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(100),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Icon(Icons.check_circle_outline,
+                                    size: 32, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(t('no_problems'),
+                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
                       ],
+                    )
+                  : ListView.builder(
+                      itemCount: problems.length,
+                      itemBuilder: (_, i) {
+                        return _ProblemCard(problem: problems[i]);
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: problems.length,
-                    itemBuilder: (_, i) {
-                      return _ProblemCard(problem: problems[i]);
-                    },
-                  ),
+            ),
           ),
         ],
       ),
