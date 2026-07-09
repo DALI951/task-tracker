@@ -8,7 +8,7 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsService>();
+    final settings = context.read<SettingsService>();
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
