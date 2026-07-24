@@ -20,9 +20,9 @@ android/build/
 local.properties
 android/app/release-key.jks
 android/app/release-key.jks.base64
-admin_app/android/app/release-key.jks
-admin_app/android/app/release-key.jks.base64
-admin_app/android/key.properties
+
+# Admin app (separate repo)
+admin_app/
 
 # iOS
 ios/Pods/
