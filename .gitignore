@@ -21,6 +21,9 @@ local.properties
 android/app/release-key.jks
 android/app/release-key.jks.base64
 
+# Firebase service account
+assets/service-account.json
+
 # Admin app (separate repo)
 admin_app/
 
