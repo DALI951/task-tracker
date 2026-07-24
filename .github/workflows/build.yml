@@ -171,7 +171,7 @@ jobs:
           find artifacts/ -type f \( -name '*.apk' -o -name '*.zip' -o -name '*.exe' \) -exec cp {} release_files/ \; 2>/dev/null || true
           ls -la release_files/ || echo "No release files found"
 
-      - name: Create GitHub Release
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
@@ -192,6 +192,7 @@ jobs:
 
             ### Changes
             See the commit history for detailed changes.
+          files: release_files/*
           draft: false
           prerelease: false
         env:
