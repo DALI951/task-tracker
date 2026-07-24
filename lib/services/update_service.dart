@@ -3,10 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:open_file/open_file.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:task_tracker/screens/update_modal.dart';
 
@@ -97,7 +94,6 @@ class UpdateService {
           body, latestVersion);
       return true;
     } catch (_) {
-      // Silently fail — don't crash the app
       return false;
     }
   }
@@ -131,10 +127,7 @@ class UpdateService {
         currentVersion: currentVersion,
         latestVersion: latestVersion,
         changelog: changelog,
-        onInstallNow: () async {
-          Navigator.pop(context);
-          await _downloadAndInstall(downloadUrl, latestVersion);
-        },
+        downloadUrl: downloadUrl,
         onLater: () async {
           Navigator.pop(context);
           final prefs = await SharedPreferences.getInstance();
@@ -213,34 +206,5 @@ class UpdateService {
       body,
       version,
     );
-  }
-
-  Future<void> _downloadAndInstall(String url, String version) async {
-    if (kIsWeb) return;
-    final hasPermission = await Permission.requestInstallPackages.request();
-    if (!hasPermission.isGranted) return;
-
-    final dir = await getTemporaryDirectory();
-    final filePath = '${dir.path}/Task-Tracker-v$version.apk';
-
-    await _dio.download(
-      url,
-      filePath,
-      onReceiveProgress: (received, total) {
-        if (total > 0) {
-          final progress = received / total;
-          _progressCallback?.call(progress);
-        }
-      },
-    );
-
-    _progressCallback = null;
-    await OpenFile.open(filePath);
-  }
-
-  Function(double)? _progressCallback;
-
-  void setProgressCallback(Function(double)? cb) {
-    _progressCallback = cb;
   }
 }

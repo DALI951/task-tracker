@@ -1,11 +1,15 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:task_tracker/config/brand.dart';
 
 class UpdateModal extends StatefulWidget {
   final String currentVersion;
   final String latestVersion;
   final String changelog;
-  final VoidCallback onInstallNow;
+  final String downloadUrl;
   final VoidCallback onLater;
   final VoidCallback onNever;
 
@@ -14,7 +18,7 @@ class UpdateModal extends StatefulWidget {
     required this.currentVersion,
     required this.latestVersion,
     required this.changelog,
-    required this.onInstallNow,
+    required this.downloadUrl,
     required this.onLater,
     required this.onNever,
   });
@@ -26,14 +30,50 @@ class UpdateModal extends StatefulWidget {
 class _UpdateModalState extends State<UpdateModal> {
   double? _progress;
   bool _downloading = false;
+  String? _error;
 
-  @override
-  void initState() {
-    super.initState();
-  }
+  Future<void> _startDownload() async {
+    final hasPermission = await Permission.requestInstallPackages.request();
+    if (!hasPermission.isGranted) {
+      if (mounted) {
+        setState(() => _error = 'Install permission denied');
+      }
+      return;
+    }
 
-  void setProgress(double p) {
-    if (mounted) setState(() => _progress = p);
+    setState(() {
+      _downloading = true;
+      _error = null;
+    });
+
+    final dio = Dio();
+    final dir = await getTemporaryDirectory();
+    final filePath = '${dir.path}/Task-Tracker-v${widget.latestVersion}.apk';
+
+    try {
+      await dio.download(
+        widget.downloadUrl,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total > 0 && mounted) {
+            setState(() => _progress = received / total);
+          }
+        },
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        await OpenFile.open(filePath);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _downloading = false;
+          _progress = null;
+          _error = 'Download failed. Please try again.';
+        });
+      }
+    }
   }
 
   @override
@@ -41,7 +81,7 @@ class _UpdateModalState extends State<UpdateModal> {
     final cs = Theme.of(context).colorScheme;
 
     return PopScope(
-      canPop: false,
+      canPop: !_downloading,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
         child: Column(
@@ -114,7 +154,14 @@ class _UpdateModalState extends State<UpdateModal> {
               ),
               const SizedBox(height: 20),
             ],
-            if (_downloading && _progress != null) ...[
+            if (_error != null) ...[
+              Text(
+                _error!,
+                style: TextStyle(color: cs.error, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_downloading) ...[
               LinearProgressIndicator(
                 value: _progress,
                 backgroundColor: cs.surfaceContainerHighest,
@@ -122,7 +169,7 @@ class _UpdateModalState extends State<UpdateModal> {
               ),
               const SizedBox(height: 8),
               Text(
-                '${(_progress! * 100).toInt()}%',
+                _progress != null ? '${(_progress! * 100).toInt()}%' : 'Starting download...',
                 style: TextStyle(
                     fontSize: 12, color: cs.onSurfaceVariant),
               ),
@@ -147,7 +194,7 @@ class _UpdateModalState extends State<UpdateModal> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: widget.onInstallNow,
+                      onPressed: _startDownload,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Brand.primary,
                         foregroundColor: Colors.white,
