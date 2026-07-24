@@ -336,6 +336,9 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     final problemCount = provider.problems.where((p) => p.status == 'open' || p.status == 'assigned').length;
 
     if (filtered.isEmpty && allTasks.isEmpty) {
+      if (provider.loading) {
+        return const Center(child: CircularProgressIndicator());
+      }
       final cs = Theme.of(context).colorScheme;
       return Center(
         child: Column(

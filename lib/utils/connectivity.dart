@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ConnectivityProvider extends ChangeNotifier {
@@ -18,6 +18,13 @@ class ConnectivityProvider extends ChangeNotifier {
   }
 
   Future<void> _check() async {
+    if (kIsWeb) {
+      if (!_online) {
+        _online = true;
+        notifyListeners();
+      }
+      return;
+    }
     try {
       final response = await http
           .get(Uri.parse('https://clients3.google.com/generate_204'))

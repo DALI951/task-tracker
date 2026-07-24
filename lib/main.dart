@@ -14,8 +14,13 @@ import 'package:task_tracker/services/update_service.dart';
 import 'package:task_tracker/utils/connectivity.dart';
 import 'package:task_tracker/widgets/offline_banner.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  runApp(const _SplashScreen());
+  _initApp();
+}
+
+Future<void> _initApp() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (!kIsWeb) {
     FirebaseFirestore.instance.settings = const Settings(
@@ -24,6 +29,37 @@ void main() async {
   }
   await SessionService().init();
   runApp(TaskTrackerApp());
+}
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Brand.primary,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.assignment, size: 40, color: Colors.white),
+              ),
+              const SizedBox(height: 24),
+              const CircularProgressIndicator(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class TaskTrackerApp extends StatelessWidget {

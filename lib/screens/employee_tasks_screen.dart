@@ -145,7 +145,9 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
             ),
           Expanded(
             child: filtered.isEmpty && allTasks.isEmpty
-              ? Center(
+              ? provider.loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
