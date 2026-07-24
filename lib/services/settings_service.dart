@@ -220,6 +220,7 @@ class SettingsService extends ChangeNotifier {
       'contact_administrator': 'Contact your administrator to set up your account.',
       'up_to_date': 'You are up to date!',
       'update_available': 'Update Available',
+      'open_web_version': 'Open Web Version',
     },
     'fr': {
       'app_name': 'Gestionnaire de Tâches',
@@ -354,6 +355,7 @@ class SettingsService extends ChangeNotifier {
       'contact_administrator': 'Contactez votre administrateur pour configurer votre compte.',
       'up_to_date': 'Vous êtes à jour !',
       'update_available': 'Mise à jour disponible',
+      'open_web_version': 'Ouvrir la version Web',
     },
     'ar': {
       'app_name': 'مدير المهام',
@@ -488,6 +490,7 @@ class SettingsService extends ChangeNotifier {
       'contact_administrator': 'اتصل بمسؤولك لإعداد حسابك.',
       'up_to_date': 'أنت تستخدم أحدث إصدار!',
       'update_available': 'تحديث متاح',
+      'open_web_version': 'فتح النسخة الويب',
     },
   };
 

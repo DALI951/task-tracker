@@ -1,5 +1,8 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/preset_task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
@@ -221,6 +224,15 @@ class SettingsScreen extends StatelessWidget {
               }
             },
           ),
+          if (!kIsWeb && !Platform.isAndroid)
+            ListTile(
+              leading: const Icon(Icons.language),
+              title: Text(t('open_web_version')),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => launchUrl(
+                Uri.parse('https://dali951.github.io/task-tracker/'),
+              ),
+            ),
           const SizedBox(height: 24),
           Center(
             child: Text(

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -43,7 +44,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Future<void> _pickAndSubmitProof() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
-      source: ImageSource.camera,
+      source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
+          ? ImageSource.gallery
+          : ImageSource.camera,
       maxWidth: 1024,
       maxHeight: 1024,
     );
@@ -75,7 +78,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Future<void> _completeAsManager() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
-      source: ImageSource.camera,
+      source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
+          ? ImageSource.gallery
+          : ImageSource.camera,
       maxWidth: 1024,
       maxHeight: 1024,
     );

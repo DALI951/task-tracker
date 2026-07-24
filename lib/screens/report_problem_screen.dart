@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -29,7 +30,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   Future<void> _takePhoto() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
-      source: ImageSource.camera,
+      source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
+          ? ImageSource.gallery
+          : ImageSource.camera,
       maxWidth: 1024,
       maxHeight: 1024,
     );

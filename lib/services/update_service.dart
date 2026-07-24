@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -52,6 +52,7 @@ class UpdateService {
 
   Future<bool> checkForUpdate(BuildContext context,
       {bool force = false}) async {
+    if (kIsWeb) return false;
     if (suppressUpdates && !force) return false;
 
     final prefs = await SharedPreferences.getInstance();
@@ -215,6 +216,7 @@ class UpdateService {
   }
 
   Future<void> _downloadAndInstall(String url, String version) async {
+    if (kIsWeb) return;
     final hasPermission = await Permission.requestInstallPackages.request();
     if (!hasPermission.isGranted) return;
 

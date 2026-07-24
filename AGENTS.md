@@ -30,6 +30,12 @@ Account creation is done via `web_admin/index.html` (not in-app).
 - "Never" saves dismissed version to SharedPreferences; can manually check from Settings
 - Settings has "Check for Updates" button that forces a check (bypasses dismiss)
 - Downloads APK via `dio`, opens via `open_file` (triggers Android installer)
+- **Auto-update is Android-only.** Disabled on web and desktop via `kIsWeb` guard.
+
+### Multi-Platform Support
+- **Android**: Full feature set (camera, auto-update, APK install)
+- **Web**: Deployed to GitHub Pages. Uses gallery picker (no camera). No auto-update.
+- **Windows Desktop**: Inno Setup installer with desktop shortcut. Uses gallery picker. Settings has "Open Web Version" button linking to GitHub Pages.
 
 ### Firestore Collections
 | Collection | Read | Write | Notes |
@@ -61,6 +67,7 @@ Account creation is done via `web_admin/index.html` (not in-app).
 | `lib/services/settings_service.dart` | Theme/language prefs + i18n |
 | `lib/services/user_service.dart` | Role management |
 | `web_admin/index.html` | Account creation website |
+| `windows/installer/task-tracker-setup.iss` | Inno Setup installer script |
 
 ### App Icon
 - Custom app icon generated via `flutter_launcher_icons` from `assets/app_icon.png`
@@ -73,21 +80,50 @@ Account creation is done via `web_admin/index.html` (not in-app).
 ```powershell
 cd C:\Users\Dali\Documents\Projects\task_tracker
 flutter pub get
+
+# Android APK
 flutter build apk --release
 # Output: build\app\outputs\flutter-apk\app-release.apk
+
+# Web
+flutter build web --release
+# Output: build\web\
+
+# Windows Desktop
+flutter build windows --release
+# Output: build\windows\x64\runner\Release\
 ```
 
 ### CI/CD (GitHub Actions)
 - Push to `master` triggers `.github/workflows/build.yml`
-- Extracts version from `pubspec.yaml`
-- Builds release APK
-- Creates GitHub release with `Task-Tracker-v{version}.apk`
+- **4 parallel jobs**: build-apk, build-web, build-windows, deploy-web
+- **create-release** job waits for all builds, then creates GitHub release with all artifacts
+- **deploy-web** job deploys web build to GitHub Pages
 - Release URL: `https://github.com/DALI951/task-tracker/releases`
+- Web URL: `https://dali951.github.io/task-tracker/`
+
+### Release Artifacts
+| File | Platform | How to use |
+|---|---|---|
+| `Task-Tracker-v{ver}.apk` | Android | Sideload on phone |
+| `Task-Tracker-v{ver}-web.zip` | Web | Unzip, open `index.html` |
+| `Task-Tracker-v{ver}-Setup.exe` | Windows | Run installer → desktop shortcut |
+
+### Windows Installer
+- Built with Inno Setup (`windows/installer/task-tracker-setup.iss`)
+- Installs to `C:\Program Files\Task Tracker\`
+- Creates desktop shortcut + Start Menu entry
+- Creates uninstaller
 
 ### To trigger a release:
 1. Update `version:` in `pubspec.yaml`
 2. Push to `master`
-3. GitHub Actions builds and creates a release with the APK
+3. GitHub Actions builds all platforms and creates a release
+
+### GitHub Pages Setup
+1. Go to repo Settings → Pages
+2. Source: "GitHub Actions"
+3. The `deploy-web` job handles deployment automatically
 
 ---
 
