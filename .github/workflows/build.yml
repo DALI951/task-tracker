@@ -178,12 +178,15 @@ jobs:
         continue-on-error: true
 
       - name: List artifacts
-        run: ls -la artifacts/
+        run: |
+          mkdir -p release_files
+          find artifacts/ -type f \( -name '*.apk' -o -name '*.zip' -o -name '*.exe' \) -exec cp {} release_files/ \;
+          ls -la release_files/
 
       - name: Prepare release files
         id: files
         run: |
-          FILES=$(find artifacts/ -type f -name '*.apk' -o -type f -name '*.zip' -o -type f -name '*.exe' | tr '\n' ' ')
+          FILES=$(ls release_files/ | sed 's|^|release_files/|' | tr '\n' ' ')
           echo "files=$FILES" >> $GITHUB_OUTPUT
           echo "Release files: $FILES"
 
@@ -214,7 +217,10 @@ jobs:
 
             ### Changes
             See the commit history for detailed changes.
-          files: ${{ steps.files.outputs.files }}
+          files: |
+            release_files/*.apk
+            release_files/*.zip
+            release_files/*.exe
           draft: false
           prerelease: false
         env:
