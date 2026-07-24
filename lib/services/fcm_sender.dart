@@ -40,12 +40,12 @@ class FcmSender {
 
     if (_accessCredentials != null &&
         _accessCredentials!.accessToken != null &&
-        !_accessCredentials!.accessToken!.isExpired) {
+        !_accessCredentials!.accessToken!.hasExpired) {
       return _accessCredentials!;
     }
 
     _accessCredentials =
-        await obtainAccessCredentialsUsingServiceAccount(
+        await obtainAccessCredentialsViaServiceAccount(
       _credentials!,
       _scope,
       _client!,
