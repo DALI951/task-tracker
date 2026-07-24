@@ -100,6 +100,11 @@ jobs:
         with:
           channel: 'stable'
 
+      - name: Setup CMake 3.x
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.6'
+
       - name: Extract version
         id: version
         run: |
@@ -113,8 +118,6 @@ jobs:
 
       - name: Build Windows
         run: flutter build windows --release
-        env:
-          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 
       - name: Install Inno Setup
         run: choco install innosetup -y
@@ -142,7 +145,7 @@ jobs:
         uses: actions/deploy-pages@v4
 
   create-release:
-    needs: [build-apk, build-web]
+    needs: [build-apk, build-web, build-windows]
     if: always() && (needs.build-apk.result == 'success' || needs.build-web.result == 'success')
     runs-on: ubuntu-latest
     steps:
@@ -180,12 +183,7 @@ jobs:
       - name: Prepare release files
         id: files
         run: |
-          FILES=""
-          for f in artifacts/*; do
-            if [ -f "$f" ]; then
-              FILES="$FILES $f"
-            fi
-          done
+          FILES=$(find artifacts/ -type f -name '*.apk' -o -type f -name '*.zip' -o -type f -name '*.exe' | tr '\n' ' ')
           echo "files=$FILES" >> $GITHUB_OUTPUT
           echo "Release files: $FILES"
 
