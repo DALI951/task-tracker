@@ -72,7 +72,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Web
-        run: flutter build web --release
+        run: flutter build web --release --base-href /task-tracker/
 
       - name: Zip web build
         run: |
