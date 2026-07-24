@@ -9,11 +9,16 @@ import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/firebase_options.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_gate.dart';
+import 'package:task_tracker/services/push_notification_service.dart';
 import 'package:task_tracker/services/session_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
 import 'package:task_tracker/utils/connectivity.dart';
 import 'package:task_tracker/widgets/offline_banner.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<ScaffoldMessengerState> scaffoldKey =
+    GlobalKey<ScaffoldMessengerState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +35,7 @@ Future<void> _initApp() async {
     try {
       await Permission.requestInstallPackages.request();
     } catch (_) {}
+    await PushNotificationService().initialize();
   }
   await SessionService().init();
   runApp(TaskTrackerApp());
@@ -112,6 +118,8 @@ class _AppWithSettings extends StatelessWidget {
     return MaterialApp(
       title: 'Task Tracker',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
+      scaffoldMessengerKey: scaffoldKey,
       theme: ThemeData(
         colorSchemeSeed: settings.accentColor,
         useMaterial3: true,
@@ -227,7 +235,19 @@ class _AppWithSettings extends StatelessWidget {
         DefaultMaterialLocalizations.delegate,
         DefaultWidgetsLocalizations.delegate,
       ],
-      home: const OfflineBanner(child: AuthGate()),
+      home: OfflineBanner(
+        child: Builder(
+          builder: (context) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              PushNotificationService().bindContext(
+                navigatorKey.currentState!,
+                scaffoldKey.currentState!,
+              );
+            });
+            return const AuthGate();
+          },
+        ),
+      ),
     );
   }
 }

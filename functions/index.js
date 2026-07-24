@@ -4,6 +4,7 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 
 const db = admin.firestore();
+const messaging = admin.messaging();
 
 async function isManager(uid) {
   const doc = await db.doc(`users/${uid}`).get();
@@ -124,3 +125,42 @@ exports.setEmployeePassword = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', e.message);
   }
 });
+
+exports.onNotificationCreated = functions.firestore
+  .document('notifications/{notifId}')
+  .onCreate(async (snap, context) => {
+    const notif = snap.data();
+    if (!notif || !notif.recipientEmail) return null;
+
+    try {
+      const usersSnap = await db.collection('users')
+        .where('email', isEqualTo: notif.recipientEmail)
+        .limit(1)
+        .get();
+
+      if (usersSnap.empty) return null;
+
+      const userDoc = usersSnap.docs[0];
+      const fcmToken = userDoc.data().fcmToken;
+      if (!fcmToken) return null;
+
+      const payload = {
+        notification: {
+          title: notif.title || 'Task Tracker',
+          body: notif.message || '',
+        },
+        data: {
+          type: notif.type || '',
+          relatedId: notif.relatedId || '',
+          notifId: context.params.notifId,
+        },
+        token: fcmToken,
+      };
+
+      await messaging.send(payload);
+      return null;
+    } catch (e) {
+      console.error('FCM send failed:', e.message);
+      return null;
+    }
+  });
