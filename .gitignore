@@ -18,6 +18,8 @@ android/build/
 *.aab
 !releases/*.apk
 local.properties
+android/app/release-key.jks
+android/app/release-key.jks.base64
 
 # iOS
 ios/Pods/
