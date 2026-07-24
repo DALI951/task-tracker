@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths-ignore:
       - 'web_admin/**'
+      - 'admin_app/**'
       - '*.md'
       - 'AGENTS.md'
       - '.gitignore'
@@ -114,83 +115,9 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-  build-admin-apk:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > admin_app/android/app/release-key.jks
-
-      - name: Create key.properties
-        run: |
-          cat > admin_app/android/key.properties << EOF
-          storePassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          storeFile=release-key.jks
-          EOF
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Install dependencies
-        run: flutter pub get
-        working-directory: admin_app
-
-      - name: Build APK
-        run: flutter build apk --release
-        working-directory: admin_app
-
-      - name: Rename APK
-        run: |
-          mkdir -p releases
-          cp admin_app/build/app/outputs/flutter-apk/app-release.apk \
-            releases/Task-Tracker-Admin.apk
-
-      - name: Upload admin APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: admin-apk
-          path: releases/Task-Tracker-Admin.apk
-
-  build-admin-web:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Install dependencies
-        run: flutter pub get
-        working-directory: admin_app
-
-      - name: Build Web
-        run: flutter build web --release --base-href /task-tracker/admin/
-        working-directory: admin_app
-
-      - name: Zip admin web build
-        run: |
-          mkdir -p releases
-          cd admin_app/build/web && zip -r "$GITHUB_WORKSPACE/releases/Task-Tracker-Admin-web.zip" .
-
-      - name: Upload admin web artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: admin-web-zip
-          path: releases/Task-Tracker-Admin-web.zip
-
   create-release:
-    needs: [build-apk, build-web, build-admin-apk, build-admin-web]
-    if: always() && (needs.build-apk.result == 'success' || needs.build-web.result == 'success' || needs.build-admin-apk.result == 'success')
+    needs: [build-apk, build-web]
+    if: always() && (needs.build-apk.result == 'success' || needs.build-web.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -227,10 +154,6 @@ jobs:
             2. Open on your Android device
             3. Allow installation from unknown sources if prompted
             4. Tap Install
-
-            ### Admin App
-            1. Download `Task-Tracker-Admin.apk` for admin account management
-            2. Open on your Android device
 
             ### Web Version
             1. Download `Task-Tracker-v${{ steps.version.outputs.version }}-web.zip`
