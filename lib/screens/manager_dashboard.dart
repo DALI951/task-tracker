@@ -1,14 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/screens/manage_employees_screen.dart';
+import 'package:task_tracker/screens/notifications_screen.dart';
 import 'package:task_tracker/screens/preset_items_screen.dart';
 import 'package:task_tracker/screens/problems_screen.dart';
 import 'package:task_tracker/screens/settings_screen.dart';
 import 'package:task_tracker/screens/task_detail_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
+import 'package:task_tracker/services/notification_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
 
@@ -248,6 +251,23 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                 style: const TextStyle(fontSize: 12),
               ),
             ),
+          ),
+          StreamBuilder<QuerySnapshot>(
+            stream: NotificationService().unreadCountStream(auth.currentUser?.email ?? ''),
+            builder: (context, snapshot) {
+              final count = snapshot.data?.docs.length ?? 0;
+              return IconButton(
+                icon: Badge(
+                  label: count > 0 ? Text('$count', style: const TextStyle(fontSize: 10, color: Colors.white)) : null,
+                  isLabelVisible: count > 0,
+                  child: const Icon(Icons.notifications_outlined),
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                ),
+              );
+            },
           ),
           PopupMenuButton<String>(
             onSelected: (v) {

@@ -8,12 +8,14 @@ import 'package:task_tracker/models/preset_task.dart';
 import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/services/firestore_service.dart';
+import 'package:task_tracker/services/notification_service.dart';
 import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
 class TaskProvider extends ChangeNotifier {
   final FirestoreService _firestore = FirestoreService();
   final StorageService _storage = StorageService();
+  final NotificationService _notif = NotificationService();
 
   List<AppTask> _tasks = [];
   List<AppTask> _pendingReview = [];
@@ -257,6 +259,13 @@ class TaskProvider extends ChangeNotifier {
       );
 
       await _firestore.addTask(task);
+      _notif.send(
+        recipientEmail: assignedToEmail,
+        type: 'task_assigned',
+        title: 'New Task Assigned',
+        message: '"$title" has been assigned to you',
+        relatedId: task.id,
+      );
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -307,6 +316,16 @@ class TaskProvider extends ChangeNotifier {
         'claimedByName': userName,
       });
       _addHistory(taskId, 'started', userName);
+      final task = _tasks.where((t) => t.id == taskId).firstOrNull;
+      if (task != null) {
+        _notif.send(
+          recipientEmail: task.createdBy,
+          type: 'task_started',
+          title: 'Task Started',
+          message: '$userName started working on "${task.title}"',
+          relatedId: taskId,
+        );
+      }
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -329,6 +348,16 @@ class TaskProvider extends ChangeNotifier {
         'completedAt': DateTime.now(),
       });
       _addHistory(taskId, 'submitted_proof', user.displayName ?? user.email ?? '');
+      final task = _tasks.where((t) => t.id == taskId).firstOrNull;
+      if (task != null) {
+        _notif.send(
+          recipientEmail: task.createdBy,
+          type: 'task_submitted',
+          title: 'Task Submitted for Review',
+          message: '${user.displayName ?? user.email} submitted "${task.title}" for review',
+          relatedId: taskId,
+        );
+      }
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -344,6 +373,16 @@ class TaskProvider extends ChangeNotifier {
         'approvedBy': approvedBy,
       });
       _addHistory(taskId, 'approved', approvedBy);
+      final task = _tasks.where((t) => t.id == taskId).firstOrNull;
+      if (task != null) {
+        _notif.send(
+          recipientEmail: task.assignedToEmail,
+          type: 'task_approved',
+          title: 'Task Approved',
+          message: '"${task.title}" has been approved',
+          relatedId: taskId,
+        );
+      }
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -361,6 +400,16 @@ class TaskProvider extends ChangeNotifier {
         'rejectionReason': reason,
       });
       _addHistory(taskId, 'rejected', reason ?? 'No reason given');
+      final task = _tasks.where((t) => t.id == taskId).firstOrNull;
+      if (task != null) {
+        _notif.send(
+          recipientEmail: task.assignedToEmail,
+          type: 'task_rejected',
+          title: 'Task Rejected',
+          message: '"${task.title}" was rejected${reason != null ? ': $reason' : ''}',
+          relatedId: taskId,
+        );
+      }
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -381,6 +430,13 @@ class TaskProvider extends ChangeNotifier {
         'completedAt': null,
       });
       _addHistory(taskId, 'reassigned', 'to $newEmployee');
+      _notif.send(
+        recipientEmail: newEmail,
+        type: 'task_assigned',
+        title: 'Task Reassigned',
+        message: 'You have been assigned a task',
+        relatedId: taskId,
+      );
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -532,6 +588,11 @@ class TaskProvider extends ChangeNotifier {
         'status': 'open',
         'convertedToTaskId': null,
       });
+      _notif.sendToManagers(
+        type: 'problem_reported',
+        title: 'Problem Reported',
+        message: '$reporterName reported a problem: ${description.length > 50 ? description.substring(0, 50) + '...' : description}',
+      );
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -546,6 +607,16 @@ class TaskProvider extends ChangeNotifier {
         'status': 'resolved',
         'convertedToTaskId': taskId,
       });
+      final problem = _problems.where((p) => p.id == problemId).firstOrNull;
+      if (problem != null && problem.reportedBy.isNotEmpty) {
+        _notif.send(
+          recipientEmail: problem.reportedBy,
+          type: 'problem_converted',
+          title: 'Problem Resolved',
+          message: 'Your reported problem has been resolved',
+          relatedId: taskId,
+        );
+      }
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -560,6 +631,16 @@ class TaskProvider extends ChangeNotifier {
         'status': 'assigned',
         'convertedToTaskId': taskId,
       });
+      final problem = _problems.where((p) => p.id == problemId).firstOrNull;
+      if (problem != null && problem.reportedBy.isNotEmpty) {
+        _notif.send(
+          recipientEmail: problem.reportedBy,
+          type: 'problem_converted',
+          title: 'Problem Converted to Task',
+          message: 'Your reported problem has been converted to a task',
+          relatedId: taskId,
+        );
+      }
       return true;
     } catch (e) {
       _error = friendlyError(e);
