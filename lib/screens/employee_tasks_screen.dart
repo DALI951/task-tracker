@@ -9,7 +9,7 @@ import 'package:task_tracker/screens/task_detail_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
-import 'package:task_tracker/services/auth_gate.dart';
+
 import 'package:task_tracker/widgets/task_card.dart';
 
 class EmployeeTasksScreen extends StatefulWidget {
@@ -99,13 +99,9 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
+            onPressed: () async {
               context.read<TaskProvider>().stopListening();
-              auth.signOut();
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const AuthGate()),
-                (_) => false,
-              );
+              await auth.signOut();
             },
           ),
         ],

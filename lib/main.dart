@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/firebase_options.dart';
 import 'package:task_tracker/providers/task_provider.dart';
@@ -26,6 +27,9 @@ Future<void> _initApp() async {
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: false,
     );
+    try {
+      await Permission.requestInstallPackages.request();
+    } catch (_) {}
   }
   await SessionService().init();
   runApp(TaskTrackerApp());

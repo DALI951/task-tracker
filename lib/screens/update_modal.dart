@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:task_tracker/config/brand.dart';
 
 class UpdateModal extends StatefulWidget {
@@ -33,21 +32,16 @@ class _UpdateModalState extends State<UpdateModal> {
   String? _error;
 
   Future<void> _startDownload() async {
-    final hasPermission = await Permission.requestInstallPackages.request();
-    if (!hasPermission.isGranted) {
-      if (mounted) {
-        setState(() => _error = 'Install permission denied');
-      }
-      return;
-    }
-
     setState(() {
       _downloading = true;
       _error = null;
     });
 
     final dio = Dio();
-    final dir = await getTemporaryDirectory();
+    dio.options.followRedirects = true;
+    dio.options.maxRedirects = 5;
+
+    final dir = await getApplicationDocumentsDirectory();
     final filePath = '${dir.path}/Task-Tracker-v${widget.latestVersion}.apk';
 
     try {

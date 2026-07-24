@@ -11,7 +11,7 @@ import 'package:task_tracker/screens/task_detail_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
-import 'package:task_tracker/services/auth_gate.dart';
+
 import 'package:task_tracker/utils/error_handler.dart';
 import 'package:task_tracker/widgets/task_card.dart';
 
@@ -291,13 +291,9 @@ class _ManagerDashboardState extends State<ManagerDashboard>
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
+            onPressed: () async {
               provider.stopListening();
-              auth.signOut();
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const AuthGate()),
-                (_) => false,
-              );
+              await auth.signOut();
             },
           ),
         ],
