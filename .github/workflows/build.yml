@@ -90,50 +90,6 @@ jobs:
         with:
           path: build/web
 
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Setup CMake 3.x
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: '3.31.6'
-
-      - name: Extract version
-        id: version
-        run: |
-          $content = Get-Content pubspec.yaml | Select-String 'version:'
-          $version = ($content -split ' ')[1] -split '\+' | Select-Object -First 1
-          echo "version=$version" >> $env:GITHUB_OUTPUT
-          Write-Host "Building version: $version"
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build Windows
-        run: flutter build windows --release
-
-      - name: Install Inno Setup
-        run: choco install innosetup -y
-
-      - name: Build Installer
-        run: |
-          $version = "${{ steps.version.outputs.version }}"
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DVersion="$version" "windows\installer\task-tracker-setup.iss"
-
-      - name: Upload Windows installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installer
-          path: releases/Task-Tracker-v${{ steps.version.outputs.version }}-Setup.exe
-
   deploy-web:
     needs: build-web
     runs-on: ubuntu-latest
