@@ -10,6 +10,7 @@ import 'package:task_tracker/screens/settings_screen.dart';
 import 'package:task_tracker/screens/task_detail_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/update_service.dart';
 import 'package:task_tracker/services/auth_gate.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 import 'package:task_tracker/widgets/task_card.dart';
@@ -41,11 +42,18 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TaskProvider>().listenToAllTasks();
       context.read<TaskProvider>().listenToProblems();
+      final us = UpdateService();
+      us.isOnHomeScreen = true;
+      us.setHomeContext(context);
+      us.checkPendingRetry();
     });
   }
 
   @override
   void dispose() {
+    final us = UpdateService();
+    us.isOnHomeScreen = false;
+    us.clearHomeContext();
     _tabController.dispose();
     _titleCtrl.dispose();
     _descCtrl.dispose();
@@ -60,6 +68,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     _selectedEmployeeEmail = null;
     _selectedCarOrThing = null;
 
+    UpdateService().suppressUpdates = true;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -180,7 +189,10 @@ class _ManagerDashboardState extends State<ManagerDashboard>
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () {
+                  UpdateService().suppressUpdates = false;
+                  Navigator.pop(ctx);
+                },
                 child: Text(t('cancel')),
               ),
               ElevatedButton(
@@ -201,6 +213,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                         presetId: _selectedPresetId,
                       );
                   if (ctx.mounted) {
+                    UpdateService().suppressUpdates = false;
                     if (ok) {
                       Navigator.pop(ctx);
                     } else {

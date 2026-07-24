@@ -8,6 +8,7 @@ import 'package:task_tracker/screens/settings_screen.dart';
 import 'package:task_tracker/screens/task_detail_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/update_service.dart';
 import 'package:task_tracker/services/auth_gate.dart';
 import 'package:task_tracker/widgets/task_card.dart';
 
@@ -29,11 +30,18 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final email = AuthService().currentUser?.email ?? '';
       context.read<TaskProvider>().listenToEmployeeTasks(email);
+      final us = UpdateService();
+      us.isOnHomeScreen = true;
+      us.setHomeContext(context);
+      us.checkPendingRetry();
     });
   }
 
   @override
   void dispose() {
+    final us = UpdateService();
+    us.isOnHomeScreen = false;
+    us.clearHomeContext();
     _searchCtrl.dispose();
     super.dispose();
   }

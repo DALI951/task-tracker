@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/services/auth_service.dart';
-import 'package:task_tracker/services/session_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
-import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _loading = false;
-  bool _isSignUp = false;
   bool _showPass = false;
 
   String t(String key) => context.read<SettingsService>().t(key);
@@ -29,21 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      final cred = _isSignUp
-          ? await _auth.signUp(_emailCtrl.text.trim(), _passwordCtrl.text)
-          : await _auth.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
-      final user = cred.user;
-      if (user != null && mounted) {
-        await SessionService().saveCredentials(
-          user.email ?? _emailCtrl.text.trim(),
-          _passwordCtrl.text,
-        );
-        await UserService().ensureManager(user.uid, user.email ?? _emailCtrl.text.trim());
-        await context.read<SettingsService>().addAccount(
-              user.email ?? _emailCtrl.text.trim(),
-              user.displayName ?? _emailCtrl.text.trim(),
-            );
-      }
+      await _auth.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
     } on Exception catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -53,11 +36,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  void _loginAs(String email) {
-    _emailCtrl.text = email;
-    _passwordCtrl.text = '';
   }
 
   @override
@@ -70,7 +48,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsService>();
-    final accounts = settings.rememberedAccounts;
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -100,72 +77,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: cs.onSurface,
                       ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  settings.t('select_role'),
-                  style: TextStyle(color: cs.onSurfaceVariant),
-                ),
-                if (accounts.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest.withAlpha(80),
-                      borderRadius: BorderRadius.circular(Brand.radiusMd),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(settings.t('remembered_accounts'),
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurfaceVariant,
-                                fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        ...accounts.take(3).map((a) => Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: InkWell(
-                                onTap: () => _loginAs(a['email']!),
-                                borderRadius: BorderRadius.circular(Brand.radiusSm),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: cs.surface,
-                                    border: Border.all(color: cs.outlineVariant),
-                                    borderRadius:
-                                        BorderRadius.circular(Brand.radiusSm),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.person_outline,
-                                          size: 18, color: cs.onSurfaceVariant),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          a['name'] ?? a['email'] ?? '',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontSize: 14),
-                                        ),
-                                      ),
-                                      InkWell(
-                                        onTap: () async {
-                                          await settings
-                                              .removeAccount(a['email']!);
-                                        },
-                                        child: Icon(Icons.close,
-                                            size: 16, color: cs.outline),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            )),
-                      ],
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 24),
                 TextFormField(
                   controller: _emailCtrl,
@@ -208,18 +119,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2),
                           )
-                        : Text(_isSignUp
-                            ? settings.t('sign_up')
-                            : settings.t('sign_in')),
+                        : Text(settings.t('sign_in')),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () =>
-                      setState(() => _isSignUp = !_isSignUp),
-                  child: Text(_isSignUp
-                      ? settings.t('has_account')
-                      : settings.t('no_account')),
                 ),
               ],
             ),

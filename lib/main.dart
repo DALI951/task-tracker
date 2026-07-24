@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -8,18 +9,24 @@ import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_gate.dart';
 import 'package:task_tracker/services/session_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/update_service.dart';
 import 'package:task_tracker/utils/connectivity.dart';
 import 'package:task_tracker/widgets/offline_banner.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: false,
+  );
   await SessionService().init();
-  runApp(const TaskTrackerApp());
+  runApp(TaskTrackerApp());
 }
 
 class TaskTrackerApp extends StatelessWidget {
-  const TaskTrackerApp({super.key});
+  TaskTrackerApp({super.key});
+
+  final _updateService = UpdateService();
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +44,18 @@ class TaskTrackerApp extends StatelessWidget {
           return c;
         }),
       ],
-      child: const _AppWithSettings(),
+      child: Builder(
+        builder: (context) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Future.delayed(const Duration(seconds: 2), () {
+              if (context.mounted) {
+                _updateService.checkForUpdate(context);
+              }
+            });
+          });
+          return const _AppWithSettings();
+        },
+      ),
     );
   }
 }
@@ -84,7 +102,8 @@ class _AppWithSettings extends StatelessWidget {
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(Brand.radiusSm),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
           elevation: 2,
@@ -140,7 +159,8 @@ class _AppWithSettings extends StatelessWidget {
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(Brand.radiusSm),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
           elevation: 2,
@@ -170,5 +190,3 @@ class _AppWithSettings extends StatelessWidget {
     );
   }
 }
-
-

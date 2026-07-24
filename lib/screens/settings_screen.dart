@@ -6,6 +6,7 @@ import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/screens/manage_employees_screen.dart';
 import 'package:task_tracker/screens/preset_items_screen.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/update_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -112,7 +113,11 @@ class SettingsScreen extends StatelessWidget {
                           : null,
                     ),
                     child: isSelected
-                        ? Icon(Icons.check, color: c.computeLuminance() > 0.5 ? Colors.black54 : Colors.white, size: 20)
+                        ? Icon(Icons.check,
+                            color: c.computeLuminance() > 0.5
+                                ? Colors.black54
+                                : Colors.white,
+                            size: 20)
                         : null,
                   ),
                 );
@@ -193,13 +198,39 @@ class SettingsScreen extends StatelessWidget {
             _section(t('preset_tasks')),
             _PresetManager(),
           ],
+          const Divider(),
+          _section(t('about')),
+          ListTile(
+            leading: const Icon(Icons.system_update_outlined),
+            title: Text(t('check_for_updates')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              final updateService = UpdateService();
+              final messenger = ScaffoldMessenger.of(context);
+              final snackBar = SnackBar(
+                content: Text(t('checking_for_updates')),
+                duration: const Duration(seconds: 2),
+              );
+              messenger.showSnackBar(snackBar);
+              final found = await updateService.checkForUpdate(context, force: true);
+              if (context.mounted && found != true) {
+                messenger.hideCurrentSnackBar();
+                messenger.showSnackBar(
+                  SnackBar(content: Text(t('up_to_date'))),
+                );
+              }
+            },
+          ),
           const SizedBox(height: 24),
           Center(
             child: Text(
               Brand.enterpriseName,
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(100),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant
+                    .withAlpha(100),
               ),
             ),
           ),

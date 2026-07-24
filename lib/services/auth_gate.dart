@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:task_tracker/screens/employee_tasks_screen.dart';
 import 'package:task_tracker/screens/login_screen.dart';
 import 'package:task_tracker/screens/manager_dashboard.dart';
-import 'package:task_tracker/screens/role_selection_screen.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 
@@ -64,7 +63,40 @@ class _AuthGateState extends State<AuthGate> {
         }
 
         if (_resolvedRole == null || _resolvedRole!.isEmpty) {
-          return RoleSelectionScreen(key: ValueKey(user.uid), uid: user.uid);
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.error_outline,
+                        size: 64, color: Theme.of(context).colorScheme.error),
+                    const SizedBox(height: 16),
+                    Text(
+                      settings.t('account_not_configured'),
+                      style: Theme.of(context).textTheme.titleMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      settings.t('contact_administrator'),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () {
+                        FirebaseAuth.instance.signOut();
+                      },
+                      child: Text(settings.t('sign_out')),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
         }
 
         if (_resolvedRole == 'manager') {
