@@ -6,6 +6,7 @@ build/
 *.iml
 .idea/
 .vscode/
+pubspec.lock
 .flutter-plugins
 .flutter-plugins-dependencies
 
