@@ -179,8 +179,8 @@ jobs:
 
       - name: Zip admin web build
         run: |
-          cd admin_app/build/web
-          zip -r ../../releases/Task-Tracker-Admin-web.zip .
+          mkdir -p releases
+          cd admin_app/build/web && zip -r "$GITHUB_WORKSPACE/releases/Task-Tracker-Admin-web.zip" .
 
       - name: Upload admin web artifact
         uses: actions/upload-artifact@v4
