@@ -94,11 +94,11 @@ class _UpdateModalState extends State<UpdateModal> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Brand.primary.withAlpha(20),
+                    color: cs.primary.withAlpha(20),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.system_update,
-                      color: Brand.primary, size: 28),
+                  child: Icon(Icons.system_update,
+                      color: cs.primary, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -165,7 +165,7 @@ class _UpdateModalState extends State<UpdateModal> {
               LinearProgressIndicator(
                 value: _progress,
                 backgroundColor: cs.surfaceContainerHighest,
-                color: Brand.primary,
+                color: cs.primary,
               ),
               const SizedBox(height: 8),
               Text(
@@ -196,8 +196,8 @@ class _UpdateModalState extends State<UpdateModal> {
                     child: ElevatedButton(
                       onPressed: _startDownload,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Brand.primary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
                       ),
                       child: const Text('Install'),
                     ),

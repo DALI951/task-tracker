@@ -125,8 +125,6 @@ class _AppWithSettings extends StatelessWidget {
           centerTitle: true,
           elevation: 0,
           scrolledUnderElevation: 1,
-          backgroundColor: Brand.cardBackground,
-          foregroundColor: Brand.primary,
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
