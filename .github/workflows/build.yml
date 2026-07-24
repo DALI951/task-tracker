@@ -113,6 +113,8 @@ jobs:
 
       - name: Build Windows
         run: flutter build windows --release
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 
       - name: Install Inno Setup
         run: choco install innosetup -y
@@ -140,7 +142,8 @@ jobs:
         uses: actions/deploy-pages@v4
 
   create-release:
-    needs: [build-apk, build-web, build-windows]
+    needs: [build-apk, build-web]
+    if: always() && (needs.build-apk.result == 'success' || needs.build-web.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -169,9 +172,22 @@ jobs:
         with:
           name: windows-installer
           path: artifacts
+        continue-on-error: true
 
       - name: List artifacts
         run: ls -la artifacts/
+
+      - name: Prepare release files
+        id: files
+        run: |
+          FILES=""
+          for f in artifacts/*; do
+            if [ -f "$f" ]; then
+              FILES="$FILES $f"
+            fi
+          done
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+          echo "Release files: $FILES"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -200,10 +216,7 @@ jobs:
 
             ### Changes
             See the commit history for detailed changes.
-          files: |
-            artifacts/Task-Tracker-v${{ steps.version.outputs.version }}.apk
-            artifacts/Task-Tracker-v${{ steps.version.outputs.version }}-web.zip
-            artifacts/Task-Tracker-v${{ steps.version.outputs.version }}-Setup.exe
+          files: ${{ steps.files.outputs.files }}
           draft: false
           prerelease: false
         env:
