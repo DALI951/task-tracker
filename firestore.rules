@@ -25,6 +25,8 @@ service cloud.firestore {
       allow read, write: if isAuth() && request.auth.uid == uid;
       // Managers can read all user docs (for admin dashboard)
       allow read: if isAuth() && isManager(request.auth.uid);
+      // All auth'd users can read other user docs (needed for FCM token lookup)
+      allow read: if isAuth();
     }
 
     // ─── Tasks ────────────────────────────────────────────────

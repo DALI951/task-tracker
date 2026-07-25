@@ -51,7 +51,7 @@ class _AuthGateState extends State<AuthGate> {
           _lastUserId = user.uid;
           _resolvedRole = null;
           _loading = true;
-          _resolveRole(settings, user.uid);
+          _resolveRole(settings, user.uid, user.email ?? '');
         }
 
         if (_loading) {
@@ -107,7 +107,7 @@ class _AuthGateState extends State<AuthGate> {
     );
   }
 
-  Future<void> _resolveRole(SettingsService settings, String uid) async {
+  Future<void> _resolveRole(SettingsService settings, String uid, String email) async {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString('role_$uid');
 
@@ -132,10 +132,22 @@ class _AuthGateState extends State<AuthGate> {
             _loading = false;
           });
         } else if (mounted) {
-          setState(() {
-            _resolvedRole = '';
-            _loading = false;
-          });
+          // Auto-provision as employee if doc is missing
+          await _userService.ensureEmployee(uid, email);
+          final retryRole = await _userService.getRole(uid);
+          if (retryRole != null && retryRole.isNotEmpty && mounted) {
+            await prefs.setString('role_$uid', retryRole);
+            settings.currentRole = retryRole;
+            setState(() {
+              _resolvedRole = retryRole;
+              _loading = false;
+            });
+          } else {
+            setState(() {
+              _resolvedRole = '';
+              _loading = false;
+            });
+          }
         }
       } catch (_) {
         if (!mounted) return;

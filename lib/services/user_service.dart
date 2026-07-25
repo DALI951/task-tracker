@@ -27,4 +27,15 @@ class UserService {
       });
     }
   }
+
+  Future<void> ensureEmployee(String uid, String email) async {
+    final doc = await _db.collection('users').doc(uid).get();
+    if (!doc.exists) {
+      await _db.collection('users').doc(uid).set({
+        'role': 'employee',
+        'email': email,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
 }
