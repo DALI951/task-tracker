@@ -354,7 +354,7 @@ class TaskProvider extends ChangeNotifier {
           recipientEmail: task.createdBy,
           type: 'task_submitted',
           title: 'Task Submitted for Review',
-          message: '${user.displayName ?? user.email} submitted "${task.title}" for review',
+          message: '${user.displayName ?? 'Unknown'} submitted "${task.title}" for review',
           relatedId: taskId,
         );
       }

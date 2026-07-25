@@ -33,10 +33,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Future<void> _claimTask() async {
     final user = AuthService().currentUser;
     if (user == null) return;
+    final name = user.displayName?.isNotEmpty == true
+        ? user.displayName!
+        : (user.email?.split('@').first ?? 'Unknown');
     final ok = await context.read<TaskProvider>().claimTask(
           widget.task.id,
           user.email ?? '',
-          user.displayName ?? user.email ?? '',
+          name,
         );
     if (mounted) toast(context, ok ? t('task_started') : context.read<TaskProvider>().error ?? 'Failed');
   }

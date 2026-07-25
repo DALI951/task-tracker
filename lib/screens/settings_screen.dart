@@ -128,38 +128,6 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const Divider(),
-          _section(t('accounts')),
-          ...settings.rememberedAccounts.map((a) => ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: Text(a['name'] ?? ''),
-                subtitle: Text(a['email'] ?? ''),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text(t('delete_account')),
-                        content: Text(t('confirm_delete_account')),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: Text(t('cancel')),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: Text(t('delete')),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirm == true) {
-                      await settings.removeAccount(a['email']!);
-                    }
-                  },
-                ),
-              )),
-          const Divider(),
           _section(t('data')),
           ListTile(
             leading: const Icon(Icons.file_download_outlined),

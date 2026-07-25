@@ -29,16 +29,15 @@ void main() {
 Future<void> _initApp() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (!kIsWeb) {
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: false,
-    );
-    try {
-      await Permission.requestInstallPackages.request();
-    } catch (_) {}
-    await PushNotificationService().initialize();
+    await SessionService().init();
+    runApp(TaskTrackerApp());
+    // Init push notifications after app is running (non-blocking)
+    PushNotificationService().initialize();
+    try { Permission.requestInstallPackages.request(); } catch (_) {}
+  } else {
+    await SessionService().init();
+    runApp(TaskTrackerApp());
   }
-  await SessionService().init();
-  runApp(TaskTrackerApp());
 }
 
 class _SplashScreen extends StatelessWidget {

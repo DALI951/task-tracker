@@ -47,9 +47,12 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     try {
       final user = AuthService().currentUser;
       if (user == null) return;
+      final name = user.displayName?.isNotEmpty == true
+          ? user.displayName!
+          : (user.email?.split('@').first ?? 'Unknown');
       await context.read<TaskProvider>().reportProblem(
             reportedBy: user.email ?? '',
-            reporterName: user.displayName ?? user.email ?? '',
+            reporterName: name,
             description: _descCtrl.text.trim(),
             photoUrl: _photoBase64,
             carOrThing: _selectedCarOrThing,
