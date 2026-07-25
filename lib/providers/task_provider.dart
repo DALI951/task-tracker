@@ -267,12 +267,14 @@ class TaskProvider extends ChangeNotifier {
       );
 
       await _firestore.addTask(task);
+      final senderName = await _userService.getDisplayName(user.email ?? '');
       _notif.send(
         recipientEmail: assignedToEmail,
         type: 'task_assigned',
         title: _t('notify_task_assigned'),
         message: '"$title" ${_t('notif_task_assigned_msg')}',
         relatedId: task.id,
+        senderName: senderName,
       );
       return true;
     } catch (e) {
@@ -332,6 +334,7 @@ class TaskProvider extends ChangeNotifier {
           title: _t('notify_task_started'),
           message: '${_t('notif_task_started_msg')} "${task.title}"'.replaceAll('{name}', userName),
           relatedId: taskId,
+          senderName: userName,
         );
       }
       return true;
@@ -362,8 +365,9 @@ class TaskProvider extends ChangeNotifier {
         recipientEmail: task.createdBy,
         type: 'task_submitted',
         title: _t('notify_task_submitted'),
-        message: '${_t('notif_task_submitted_msg')} "${task.title}"'.replaceAll('{name}', user.displayName ?? user.email?.split('@').first ?? 'Unknown'),
+        message: '${_t('notif_task_submitted_msg')} "${task.title}"'.replaceAll('{name}', await _userService.getDisplayName(user.email ?? '')),
         relatedId: taskId,
+        senderName: await _userService.getDisplayName(user.email ?? ''),
       );
       }
       return true;
@@ -389,6 +393,7 @@ class TaskProvider extends ChangeNotifier {
           title: _t('notify_task_approved'),
           message: '"${task.title}" ${_t('notif_task_approved_msg')}',
           relatedId: taskId,
+          senderName: await _userService.getDisplayName(approvedBy),
         );
       }
       return true;
@@ -416,6 +421,7 @@ class TaskProvider extends ChangeNotifier {
           title: _t('notify_task_rejected'),
           message: '"${task.title}" ${_t('notif_task_rejected_msg')}',
           relatedId: taskId,
+          senderName: '',
         );
       }
       return true;
@@ -444,6 +450,7 @@ class TaskProvider extends ChangeNotifier {
         title: _t('notify_task_reassigned'),
         message: _t('notif_task_reassigned_msg'),
         relatedId: taskId,
+        senderName: '',
       );
       return true;
     } catch (e) {
@@ -600,6 +607,7 @@ class TaskProvider extends ChangeNotifier {
         type: 'problem_reported',
         title: _t('notify_problem_reported'),
         message: _t('notif_problem_reported_msg').replaceAll('{name}', reporterName),
+        senderName: reporterName,
       );
       return true;
     } catch (e) {
@@ -623,6 +631,7 @@ class TaskProvider extends ChangeNotifier {
           title: _t('notify_problem_resolved'),
           message: _t('notif_problem_resolved_msg'),
           relatedId: taskId,
+          senderName: '',
         );
       }
       return true;
@@ -647,6 +656,7 @@ class TaskProvider extends ChangeNotifier {
           title: _t('notify_problem_converted'),
           message: _t('notif_problem_converted_msg'),
           relatedId: taskId,
+          senderName: '',
         );
       }
       return true;

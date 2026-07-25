@@ -9,6 +9,7 @@ import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
 class TaskDetailScreen extends StatefulWidget {
@@ -33,9 +34,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Future<void> _claimTask() async {
     final user = AuthService().currentUser;
     if (user == null) return;
-    final name = user.displayName?.isNotEmpty == true
-        ? user.displayName!
-        : (user.email?.split('@').first ?? 'Unknown');
+    final name = await UserService().getDisplayName(user.email ?? '');
     final ok = await context.read<TaskProvider>().claimTask(
           widget.task.id,
           user.email ?? '',
@@ -174,7 +173,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: selectedEmail,
+                  value: selectedEmail,
                   decoration: InputDecoration(labelText: t('employee_name'), border: const OutlineInputBorder()),
                   items: employees.map((e) => DropdownMenuItem(
                     value: e['email'] as String? ?? '',
@@ -261,7 +260,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         builder: (ctx, setDState) => AlertDialog(
           title: Text(t('reassign')),
           content: DropdownButtonFormField<String>(
-            initialValue: null,
+            value: null,
             decoration: InputDecoration(
               labelText: t('employee_name'),
               border: const OutlineInputBorder(),
@@ -579,7 +578,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 child: SizedBox(
                   width: double.infinity,
                   child: DropdownButtonFormField<String>(
-                    initialValue: task.status,
+                    value: task.status,
                     decoration: InputDecoration(
                       labelText: t('status'),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

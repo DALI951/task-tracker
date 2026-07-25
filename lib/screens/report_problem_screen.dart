@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
 class ReportProblemScreen extends StatefulWidget {
@@ -47,9 +48,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     try {
       final user = AuthService().currentUser;
       if (user == null) return;
-      final name = user.displayName?.isNotEmpty == true
-          ? user.displayName!
-          : (user.email?.split('@').first ?? 'Unknown');
+      final name = await UserService().getDisplayName(user.email ?? '');
       await context.read<TaskProvider>().reportProblem(
             reportedBy: user.email ?? '',
             reporterName: name,
@@ -97,7 +96,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           const SizedBox(height: 12),
           if (items.isNotEmpty)
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedCarOrThing,
+                    value: _selectedCarOrThing,
               decoration: InputDecoration(
                 labelText: t('car_thing'),
                 border: const OutlineInputBorder(),

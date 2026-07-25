@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.task_tracker"
+    namespace = "com.tasktracker.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.task_tracker"
+        applicationId = "com.tasktracker.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

@@ -249,7 +249,7 @@ class _ProblemCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 if (employees.isNotEmpty)
                   DropdownButtonFormField<String>(
-                    initialValue: selectedEmail,
+                    value: selectedEmail,
                     decoration: InputDecoration(
                       labelText: context.read<SettingsService>().t('employee_name'),
                       border: const OutlineInputBorder(),

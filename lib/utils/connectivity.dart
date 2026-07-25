@@ -6,10 +6,17 @@ class ConnectivityProvider extends ChangeNotifier {
   bool _online = true;
   bool get online => _online;
   Timer? _timer;
+  int _consecutiveFailures = 0;
+
+  static const _endpoints = [
+    'https://www.google.com/generate_204',
+    'https://www.gstatic.com/generate_204',
+    'https://cp.cloudflare.com/generate_204',
+  ];
 
   void start() {
     _check();
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) => _check());
+    _timer = Timer.periodic(const Duration(seconds: 20), (_) => _check());
   }
 
   void stop() {
@@ -25,17 +32,29 @@ class ConnectivityProvider extends ChangeNotifier {
       }
       return;
     }
-    try {
-      final response = await http
-          .get(Uri.parse('https://clients3.google.com/generate_204'))
-          .timeout(const Duration(seconds: 5));
-      final online = response.statusCode == 204;
-      if (online != _online) {
-        _online = online;
+
+    bool reachedInternet = false;
+    for (final url in _endpoints) {
+      try {
+        final response = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 5));
+        if (response.statusCode == 204) {
+          reachedInternet = true;
+          break;
+        }
+      } catch (_) {}
+    }
+
+    if (reachedInternet) {
+      _consecutiveFailures = 0;
+      if (!_online) {
+        _online = true;
         notifyListeners();
       }
-    } catch (_) {
-      if (_online) {
+    } else {
+      _consecutiveFailures++;
+      if (_consecutiveFailures >= 2 && _online) {
         _online = false;
         notifyListeners();
       }

@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -192,7 +191,7 @@ class SettingsScreen extends StatelessWidget {
               }
             },
           ),
-          if (!kIsWeb && !Platform.isAndroid)
+          if (!kIsWeb && defaultTargetPlatform != TargetPlatform.android)
             ListTile(
               leading: const Icon(Icons.language),
               title: Text(t('open_web_version')),

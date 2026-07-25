@@ -4,6 +4,7 @@ class AppNotification {
   final String type;
   final String title;
   final String message;
+  final String senderName;
   final bool read;
   final DateTime createdAt;
   final String? relatedId;
@@ -14,6 +15,7 @@ class AppNotification {
     required this.type,
     required this.title,
     required this.message,
+    this.senderName = '',
     this.read = false,
     required this.createdAt,
     this.relatedId,
@@ -26,6 +28,7 @@ class AppNotification {
       type: map['type'] as String? ?? '',
       title: map['title'] as String? ?? '',
       message: map['message'] as String? ?? '',
+      senderName: map['senderName'] as String? ?? '',
       read: map['read'] as bool? ?? false,
       createdAt: (map['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
       relatedId: map['relatedId'] as String?,
@@ -38,6 +41,7 @@ class AppNotification {
       'type': type,
       'title': title,
       'message': message,
+      'senderName': senderName,
       'read': read,
       'createdAt': createdAt,
       'relatedId': relatedId,

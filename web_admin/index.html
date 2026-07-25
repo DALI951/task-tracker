@@ -93,16 +93,16 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
-        import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
+        import { getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
         import { getFirestore, doc, setDoc } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
 
         const firebaseConfig = {
-            apiKey: "AIzaSyCm-npO3B4toDBgYQltMRbPOMJxeeypVbw",
+            apiKey: "AIzaSyCq3-FOmjHuQH86QfA5Vf7c8hyneS0nbC0",
             authDomain: "task-tracker-6d7e1.firebaseapp.com",
             projectId: "task-tracker-6d7e1",
             storageBucket: "task-tracker-6d7e1.firebasestorage.app",
             messagingSenderId: "202182349540",
-            appId: "1:202182349540:android:ac882cbe77afa54f5752f1"
+            appId: "1:202182349540:web:ac882cbe77afa54f5752f1"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -110,8 +110,6 @@
         const db = getFirestore(app);
 
         const ADMIN_PASS = 'tasktracker2024';
-        let adminEmail = null;
-        let adminPass = null;
 
         window.authGate = function() {
             const pass = document.getElementById('adminPass').value;
@@ -143,20 +141,6 @@
             btn.textContent = 'Creating...';
 
             try {
-                // Sign in as admin temporarily to create the user
-                if (!adminEmail) {
-                    // Use anonymous sign-in as a workaround
-                    const anonCred = await signInAnonymously(auth);
-                    adminEmail = 'anonymous';
-                    adminPass = null;
-                }
-
-                // Create the user account using REST API approach
-                // We'll use a Cloud Function-free method: create via client SDK
-                // First sign out the anonymous user
-                await signOut(auth);
-
-                // Create user via REST API
                 const response = await fetch(
                     `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
                     {
@@ -179,23 +163,33 @@
                     return;
                 }
 
-                // Sign in as the new user to write their Firestore doc
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const uid = userCredential.user.uid;
 
-                // Create the users/{uid} document with role
-                await setDoc(doc(db, 'users', userCredential.user.uid), {
-                    email: email,
-                    displayName: displayName,
-                    role: role,
-                    createdAt: new Date().toISOString()
-                });
+                const batch = [
+                    setDoc(doc(db, 'users', uid), {
+                        email: email,
+                        displayName: displayName,
+                        role: role,
+                        createdAt: new Date().toISOString()
+                    })
+                ];
 
-                // Sign out the new user
+                if (role === 'employee') {
+                    batch.push(setDoc(doc(db, 'employees', email), {
+                        email: email,
+                        name: displayName,
+                        displayName: displayName,
+                        createdBy: 'web_admin',
+                        createdAt: new Date().toISOString()
+                    }));
+                }
+
+                await Promise.all(batch);
                 await signOut(auth);
 
                 showMessage(`Account created: ${email} (${role})`, 'success');
 
-                // Clear form
                 document.getElementById('email').value = '';
                 document.getElementById('password').value = '';
                 document.getElementById('displayName').value = '';
@@ -211,7 +205,6 @@
 
         window.signOutAdmin = function() {
             signOut(auth);
-            adminEmail = null;
             document.getElementById('formScreen').classList.add('hidden');
             document.getElementById('gateScreen').classList.remove('hidden');
             document.getElementById('adminPass').value = '';

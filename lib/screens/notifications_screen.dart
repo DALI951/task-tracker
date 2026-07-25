@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:task_tracker/models/app_notification.dart';
 import 'package:task_tracker/screens/notification_preferences_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/notification_service.dart';
+import 'package:task_tracker/services/settings_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -160,6 +162,9 @@ class _NotificationTile extends StatelessWidget {
     final color = _colorForType(notification.type);
     final icon = _iconForType(notification.type);
     final timeAgo = _timeAgo(notification.createdAt);
+    final t = context.read<SettingsService>().t;
+    final title = _localizedTitle(t, notification);
+    final message = _localizedMessage(t, notification);
 
     return Dismissible(
       key: Key(notification.id),
@@ -199,14 +204,14 @@ class _NotificationTile extends StatelessWidget {
           child: Icon(icon, color: color, size: 20),
         ),
         title: Text(
-          notification.title,
+          title,
           style: TextStyle(
             fontWeight: notification.read ? FontWeight.normal : FontWeight.w600,
             fontSize: 14,
           ),
         ),
         subtitle: Text(
-          notification.message,
+          message,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
@@ -232,6 +237,38 @@ class _NotificationTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _localizedTitle(String Function(String) t, AppNotification n) {
+    switch (n.type) {
+      case 'task_assigned': return t('notify_task_assigned');
+      case 'task_started': return t('notify_task_started');
+      case 'task_submitted': return t('notify_task_submitted');
+      case 'task_approved': return t('notify_task_approved');
+      case 'task_rejected': return t('notify_task_rejected');
+      case 'problem_reported': return t('notify_problem_reported');
+      case 'problem_converted': return t('notify_problem_converted');
+      default: return n.title;
+    }
+  }
+
+  String _localizedMessage(String Function(String) t, AppNotification n) {
+    final name = n.senderName;
+    switch (n.type) {
+      case 'task_assigned': return '"${_extractQuoted(n.message)}" ${t('notif_task_assigned_msg')}';
+      case 'task_started': return '${t('notif_task_started_msg')} "${_extractQuoted(n.message)}"'.replaceAll('{name}', name);
+      case 'task_submitted': return '${t('notif_task_submitted_msg')} "${_extractQuoted(n.message)}"'.replaceAll('{name}', name);
+      case 'task_approved': return '"${_extractQuoted(n.message)}" ${t('notif_task_approved_msg')}';
+      case 'task_rejected': return '"${_extractQuoted(n.message)}" ${t('notif_task_rejected_msg')}';
+      case 'problem_reported': return t('notif_problem_reported_msg').replaceAll('{name}', name);
+      case 'problem_converted': return t('notif_problem_converted_msg');
+      default: return n.message;
+    }
+  }
+
+  String _extractQuoted(String text) {
+    final match = RegExp(r'"([^"]+)"').firstMatch(text);
+    return match?.group(1) ?? text;
   }
 
   String _timeAgo(DateTime dt) {

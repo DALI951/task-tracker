@@ -74,6 +74,7 @@ class NotificationService {
     required String title,
     required String message,
     String? relatedId,
+    String senderName = '',
   }) async {
     final prefs = await getPrefs(recipientEmail);
     if (prefs[type] == false) return;
@@ -83,6 +84,7 @@ class NotificationService {
       'type': type,
       'title': title,
       'message': message,
+      'senderName': senderName,
       'read': false,
       'createdAt': FieldValue.serverTimestamp(),
       'relatedId': relatedId,
@@ -147,6 +149,7 @@ class NotificationService {
     required String title,
     required String message,
     String? relatedId,
+    String senderName = '',
   }) async {
     final usersSnap = await _db.collection('users')
         .where('role', isEqualTo: 'manager')
@@ -160,6 +163,7 @@ class NotificationService {
           title: title,
           message: message,
           relatedId: relatedId,
+          senderName: senderName,
         );
       }
     }
