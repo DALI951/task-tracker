@@ -37,9 +37,12 @@
         .dashboard-info .value { font-size: 15px; color: #1a1a1a; font-weight: 500; margin-top: 2px; }
         .section-title { font-size: 13px; font-weight: 700; color: #666; margin: 20px 0 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         .divider { height: 1px; background: #eee; margin: 20px 0; }
+        #debug { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; color: #0f0; font-family: monospace; font-size: 11px; padding: 6px 10px; z-index: 9999; max-height: 80px; overflow-y: auto; }
     </style>
 </head>
 <body>
+    <div id="debug">Starting...</div>
+
     <div class="card">
         <!-- Sign Up Screen -->
         <div id="signupScreen">
@@ -139,6 +142,14 @@
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
 
+        function debug(msg) {
+            const el = document.getElementById('debug');
+            el.textContent = msg;
+            console.log('[MOD]', msg);
+        }
+
+        debug('Initializing Firebase...');
+
         const firebaseConfig = {
             apiKey: "AIzaSyCq3-FOmjHuQH86QfA5Vf7c8hyneS0nbC0",
             authDomain: "task-tracker-6d7e1.firebaseapp.com",
@@ -152,23 +163,10 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        let authCheckDone = false;
-
-        onAuthStateChanged(auth, async (user) => {
-            if (authCheckDone) return;
-            authCheckDone = true;
-
-            if (user) {
-                const userDoc = await getDoc(doc(db, 'users', user.uid));
-                if (userDoc.exists() && userDoc.data().role === 'moderator') {
-                    showDashboard(user, userDoc.data());
-                    return;
-                }
-                signOut(auth);
-            }
-        });
+        debug('Firebase ready. Waiting for auth...');
 
         function showScreen(id) {
+            debug('showScreen: ' + id);
             document.getElementById('signupScreen').classList.add('hidden');
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('dashboardScreen').classList.add('hidden');
@@ -176,6 +174,7 @@
         }
 
         function showDashboard(user, userData) {
+            debug('showDashboard: ' + user.email);
             document.getElementById('dashEmail').textContent = user.email;
             document.getElementById('dashEmailValue').textContent = user.email;
             document.getElementById('dashName').textContent = userData.displayName || user.email;
@@ -184,21 +183,48 @@
 
         function showMessage(elId, text, type) {
             const el = document.getElementById(elId);
-            el.className = `message ${type}`;
+            el.className = 'message ' + type;
             el.textContent = text;
-            if (type === 'success') {
-                setTimeout(() => { el.textContent = ''; el.className = ''; }, 3000);
-            }
-        }
-
-        function resetButton(btn, text) {
-            btn.disabled = false;
-            btn.textContent = text;
+            if (type === 'success') setTimeout(() => { el.textContent = ''; el.className = ''; }, 3000);
         }
 
         window.showScreen = showScreen;
 
+        let initialAuthCheckDone = false;
+
+        onAuthStateChanged(auth, async (user) => {
+            debug('onAuthStateChanged: user=' + (user ? user.email : 'null') + ' initialCheckDone=' + initialAuthCheckDone);
+
+            if (initialAuthCheckDone) {
+                debug('Skipping (already handled initial auth)');
+                return;
+            }
+            initialAuthCheckDone = true;
+
+            if (user) {
+                debug('Found existing user: ' + user.email + ' uid=' + user.uid);
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    debug('Doc exists=' + userDoc.exists() + (userDoc.exists() ? ' role=' + userDoc.data().role : ''));
+                    if (userDoc.exists() && userDoc.data().role === 'moderator') {
+                        showDashboard(user, userDoc.data());
+                    } else {
+                        debug('Not moderator, signing out silently');
+                        await signOut(auth);
+                        debug('Signed out. Staying on current screen.');
+                    }
+                } catch (e) {
+                    debug('Error reading doc: ' + e.message);
+                    await signOut(auth);
+                }
+            } else {
+                debug('No user signed in. Showing signup.');
+                showScreen('signupScreen');
+            }
+        });
+
         window.signUp = async function() {
+            debug('signUp clicked');
             const email = document.getElementById('suEmail').value.trim();
             const password = document.getElementById('suPassword').value;
             const displayName = document.getElementById('suName').value.trim();
@@ -217,24 +243,29 @@
             btn.textContent = 'Creating...';
 
             try {
+                debug('Creating user: ' + email);
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                const uid = userCredential.user.uid;
+                debug('User created uid=' + userCredential.user.uid);
 
-                await setDoc(doc(db, 'users', uid), {
+                await setDoc(doc(db, 'users', userCredential.user.uid), {
                     email: email,
                     displayName: displayName,
                     role: 'moderator',
                     createdAt: new Date().toISOString()
                 });
+                debug('Firestore doc created. Showing dashboard.');
 
                 showDashboard(userCredential.user, { displayName, email });
             } catch (e) {
+                debug('SignUp error: ' + e.message);
                 showMessage('suMessage', e.message || 'Failed to create account', 'error');
-                resetButton(btn, 'Create Account');
+                btn.disabled = false;
+                btn.textContent = 'Create Account';
             }
         };
 
         window.logIn = async function() {
+            debug('logIn clicked');
             const email = document.getElementById('liEmail').value.trim();
             const password = document.getElementById('liPassword').value;
 
@@ -248,21 +279,31 @@
             btn.textContent = 'Signing in...';
 
             try {
+                debug('Signing in: ' + email);
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                const uid = userCredential.user.uid;
+                debug('Signed in uid=' + userCredential.user.uid);
 
-                const userDoc = await getDoc(doc(db, 'users', uid));
+                debug('Reading Firestore doc...');
+                const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+                debug('Doc exists=' + userDoc.exists() + (userDoc.exists() ? ' role=' + userDoc.data().role : ''));
+
                 if (userDoc.exists() && userDoc.data().role === 'moderator') {
+                    debug('Moderator confirmed. Showing dashboard.');
                     showDashboard(userCredential.user, userDoc.data());
                 } else {
+                    debug('NOT moderator. Showing access denied.');
                     showMessage('liMessage', 'Access Denied. This account is not a moderator.', 'error');
                     await signOut(auth);
-                    resetButton(btn, 'Log In');
+                    debug('Signed out after access denied.');
                 }
             } catch (e) {
+                debug('Login error: ' + e.message);
                 showMessage('liMessage', e.message || 'Failed to sign in', 'error');
-                resetButton(btn, 'Log In');
             }
+
+            btn.disabled = false;
+            btn.textContent = 'Log In';
+            debug('Button reset.');
         };
 
         window.changePassword = async function() {
@@ -299,12 +340,15 @@
             } catch (e) {
                 showMessage('cpMessage', e.message || 'Failed to update password', 'error');
             } finally {
-                resetButton(btn, 'Update Password');
+                btn.disabled = false;
+                btn.textContent = 'Update Password';
             }
         };
 
-        window.signOutUser = function() {
-            signOut(auth);
+        window.signOutUser = async function() {
+            debug('Signing out user...');
+            await signOut(auth);
+            debug('Signed out. Showing signup.');
             showScreen('signupScreen');
         };
     </script>
