@@ -17,6 +17,10 @@
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; }
         .form-group input { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
         .form-group input:focus { outline: none; border-color: #1565C0; box-shadow: 0 0 0 3px rgba(21,101,192,0.1); }
+        .pw-wrap { position: relative; }
+        .pw-wrap input { padding-right: 42px; }
+        .pw-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px; color: #999; font-size: 13px; }
+        .pw-toggle:hover { color: #333; }
         .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
         .btn-primary { background: #1565C0; color: white; }
         .btn-primary:hover { background: #0D47A1; }
@@ -56,7 +60,10 @@
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="suPassword" placeholder="Min 6 characters">
+                <div class="pw-wrap">
+                    <input type="password" id="suPassword" placeholder="Min 6 characters">
+                    <button type="button" class="pw-toggle" onclick="togglePw('suPassword', this)">Show</button>
+                </div>
             </div>
             <div class="form-group">
                 <label>Display Name</label>
@@ -82,7 +89,10 @@
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="liPassword" placeholder="Your password" onkeypress="if(event.key==='Enter')logIn()">
+                <div class="pw-wrap">
+                    <input type="password" id="liPassword" placeholder="Your password" onkeypress="if(event.key==='Enter')logIn()">
+                    <button type="button" class="pw-toggle" onclick="togglePw('liPassword', this)">Show</button>
+                </div>
             </div>
             <button class="btn btn-primary" id="liBtn" onclick="logIn()">Log In</button>
             <div class="link"><a onclick="showScreen('signupScreen')">Don't have an account? Sign Up</a></div>
@@ -113,18 +123,35 @@
             </div>
 
             <div class="divider"></div>
+            <div class="section-title">Change Display Name</div>
+            <div class="form-group">
+                <input type="text" id="newName" placeholder="New display name">
+            </div>
+            <button class="btn btn-primary" id="nameBtn" onclick="changeName()">Update Name</button>
+            <div id="nameMessage"></div>
+
+            <div class="divider"></div>
             <div class="section-title">Change Password</div>
             <div class="form-group">
                 <label>Current Password</label>
-                <input type="password" id="cpCurrent" placeholder="Current password">
+                <div class="pw-wrap">
+                    <input type="password" id="cpCurrent" placeholder="Current password">
+                    <button type="button" class="pw-toggle" onclick="togglePw('cpCurrent', this)">Show</button>
+                </div>
             </div>
             <div class="form-group">
                 <label>New Password</label>
-                <input type="password" id="cpNew" placeholder="Min 6 characters">
+                <div class="pw-wrap">
+                    <input type="password" id="cpNew" placeholder="Min 6 characters">
+                    <button type="button" class="pw-toggle" onclick="togglePw('cpNew', this)">Show</button>
+                </div>
             </div>
             <div class="form-group">
                 <label>Confirm New Password</label>
-                <input type="password" id="cpConfirm" placeholder="Confirm new password">
+                <div class="pw-wrap">
+                    <input type="password" id="cpConfirm" placeholder="Confirm new password">
+                    <button type="button" class="pw-toggle" onclick="togglePw('cpConfirm', this)">Show</button>
+                </div>
             </div>
             <button class="btn btn-primary" id="cpBtn" onclick="changePassword()">Update Password</button>
             <div id="cpMessage"></div>
@@ -136,8 +163,8 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
-        import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword, reauthenticateWithCredential, updateProfile, EmailAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
+        import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyCq3-FOmjHuQH86QfA5Vf7c8hyneS0nbC0",
@@ -166,6 +193,17 @@
             if (type === 'success') setTimeout(() => { el.textContent = ''; el.className = ''; }, 3000);
         }
 
+        window.togglePw = function(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'Show';
+            }
+        };
+
         window.showScreen = showScreen;
 
         window.signUp = async function() {
@@ -188,6 +226,7 @@
 
             try {
                 const cred = await createUserWithEmailAndPassword(auth, email, password);
+                await updateProfile(cred.user, { displayName: displayName });
                 await setDoc(doc(db, 'users', cred.user.uid), {
                     email: email,
                     displayName: displayName,
@@ -198,6 +237,7 @@
                 document.getElementById('dashEmailValue').textContent = email;
                 document.getElementById('dashName').textContent = displayName;
                 document.getElementById('dashRole').textContent = 'Manager';
+                document.getElementById('newName').value = displayName;
                 showScreen('dashboardScreen');
             } catch (e) {
                 showMsg('suMessage', e.message || 'Failed to create account', 'error');
@@ -224,10 +264,12 @@
                 const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
 
                 if (userDoc.exists() && userDoc.data().role === 'manager') {
+                    const data = userDoc.data();
                     document.getElementById('dashEmail').textContent = cred.user.email;
                     document.getElementById('dashEmailValue').textContent = cred.user.email;
-                    document.getElementById('dashName').textContent = userDoc.data().displayName || cred.user.email;
+                    document.getElementById('dashName').textContent = data.displayName || cred.user.email;
                     document.getElementById('dashRole').textContent = 'Manager';
+                    document.getElementById('newName').value = data.displayName || '';
                     showScreen('dashboardScreen');
                 } else {
                     const role = userDoc.exists() ? userDoc.data().role : 'none';
@@ -240,6 +282,31 @@
 
             btn.disabled = false;
             btn.textContent = 'Log In';
+        };
+
+        window.changeName = async function() {
+            const newName = document.getElementById('newName').value.trim();
+            if (!newName) {
+                showMsg('nameMessage', 'Name cannot be empty', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('nameBtn');
+            btn.disabled = true;
+            btn.textContent = 'Updating...';
+
+            try {
+                const user = auth.currentUser;
+                await updateProfile(user, { displayName: newName });
+                await updateDoc(doc(db, 'users', user.uid), { displayName: newName });
+                document.getElementById('dashName').textContent = newName;
+                showMsg('nameMessage', 'Name updated successfully', 'success');
+            } catch (e) {
+                showMsg('nameMessage', e.message || 'Failed to update name', 'error');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Update Name';
         };
 
         window.changePassword = async function() {
