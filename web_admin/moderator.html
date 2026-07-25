@@ -152,30 +152,51 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        let authCheckDone = false;
+
         onAuthStateChanged(auth, async (user) => {
+            if (authCheckDone) return;
+            authCheckDone = true;
+
             if (user) {
                 const userDoc = await getDoc(doc(db, 'users', user.uid));
                 if (userDoc.exists() && userDoc.data().role === 'moderator') {
-                    document.getElementById('dashEmail').textContent = user.email;
-                    document.getElementById('dashEmailValue').textContent = user.email;
-                    document.getElementById('dashName').textContent = userDoc.data().displayName || user.email;
-                    showScreen('dashboardScreen');
-                } else {
-                    showScreen('loginScreen');
-                    showMessage('liMessage', 'Access Denied. This account is not a moderator.', 'error');
-                    signOut(auth);
+                    showDashboard(user, userDoc.data());
+                    return;
                 }
-            } else {
-                showScreen('signupScreen');
+                signOut(auth);
             }
         });
 
-        window.showScreen = function(id) {
+        function showScreen(id) {
             document.getElementById('signupScreen').classList.add('hidden');
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('dashboardScreen').classList.add('hidden');
             document.getElementById(id).classList.remove('hidden');
-        };
+        }
+
+        function showDashboard(user, userData) {
+            document.getElementById('dashEmail').textContent = user.email;
+            document.getElementById('dashEmailValue').textContent = user.email;
+            document.getElementById('dashName').textContent = userData.displayName || user.email;
+            showScreen('dashboardScreen');
+        }
+
+        function showMessage(elId, text, type) {
+            const el = document.getElementById(elId);
+            el.className = `message ${type}`;
+            el.textContent = text;
+            if (type === 'success') {
+                setTimeout(() => { el.textContent = ''; el.className = ''; }, 3000);
+            }
+        }
+
+        function resetButton(btn, text) {
+            btn.disabled = false;
+            btn.textContent = text;
+        }
+
+        window.showScreen = showScreen;
 
         window.signUp = async function() {
             const email = document.getElementById('suEmail').value.trim();
@@ -206,15 +227,10 @@
                     createdAt: new Date().toISOString()
                 });
 
-                showMessage('suMessage', 'Account created! Signing in...', 'success');
-                document.getElementById('suEmail').value = '';
-                document.getElementById('suPassword').value = '';
-                document.getElementById('suName').value = '';
+                showDashboard(userCredential.user, { displayName, email });
             } catch (e) {
                 showMessage('suMessage', e.message || 'Failed to create account', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Create Account';
+                resetButton(btn, 'Create Account');
             }
         };
 
@@ -232,11 +248,20 @@
             btn.textContent = 'Signing in...';
 
             try {
-                await signInWithEmailAndPassword(auth, email, password);
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const uid = userCredential.user.uid;
+
+                const userDoc = await getDoc(doc(db, 'users', uid));
+                if (userDoc.exists() && userDoc.data().role === 'moderator') {
+                    showDashboard(userCredential.user, userDoc.data());
+                } else {
+                    showMessage('liMessage', 'Access Denied. This account is not a moderator.', 'error');
+                    await signOut(auth);
+                    resetButton(btn, 'Log In');
+                }
             } catch (e) {
                 showMessage('liMessage', e.message || 'Failed to sign in', 'error');
-                btn.disabled = false;
-                btn.textContent = 'Log In';
+                resetButton(btn, 'Log In');
             }
         };
 
@@ -274,23 +299,14 @@
             } catch (e) {
                 showMessage('cpMessage', e.message || 'Failed to update password', 'error');
             } finally {
-                btn.disabled = false;
-                btn.textContent = 'Update Password';
+                resetButton(btn, 'Update Password');
             }
         };
 
         window.signOutUser = function() {
             signOut(auth);
+            showScreen('signupScreen');
         };
-
-        function showMessage(elId, text, type) {
-            const el = document.getElementById(elId);
-            el.className = `message ${type}`;
-            el.textContent = text;
-            if (type === 'success') {
-                setTimeout(() => { el.textContent = ''; el.className = ''; }, 3000);
-            }
-        }
     </script>
 </body>
 </html>
