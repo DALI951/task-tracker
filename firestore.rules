@@ -43,7 +43,7 @@ service cloud.firestore {
       allow update: if isAuth() &&
         resource.data.assignedToEmail == userEmail() &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'claimedBy', 'photoUrl', 'history',
+          .hasOnly(['status', 'claimedBy', 'claimedByName', 'photoUrl', 'history',
                     'rejectionReason', 'completedAt', 'startedAt']);
     }
 
