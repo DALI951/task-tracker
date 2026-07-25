@@ -37,7 +37,7 @@
         .dashboard-info .value { font-size: 15px; color: #1a1a1a; font-weight: 500; margin-top: 2px; }
         .section-title { font-size: 13px; font-weight: 700; color: #666; margin: 20px 0 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         .divider { height: 1px; background: #eee; margin: 20px 0; }
-        #debug { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; color: #0f0; font-family: monospace; font-size: 11px; padding: 6px 10px; z-index: 9999; max-height: 80px; overflow-y: auto; }
+        #debug { display: none; }
     </style>
 </head>
 <body>
@@ -51,7 +51,7 @@
                     <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                 </div>
                 <h1>Create Account</h1>
-                <p>Register as a moderator</p>
+                <p>Register as a manager</p>
             </div>
             <div class="form-group">
                 <label>Email</label>
@@ -206,11 +206,11 @@
                 try {
                     const userDoc = await getDoc(doc(db, 'users', user.uid));
                     debug('Doc exists=' + userDoc.exists() + (userDoc.exists() ? ' role=' + userDoc.data().role : ''));
-                    if (userDoc.exists() && userDoc.data().role === 'moderator') {
+                    if (userDoc.exists() && userDoc.data().role === 'manager') {
                         showDashboard(user, userDoc.data());
                     } else {
                         const actualRole = userDoc.exists() ? userDoc.data().role : 'NO DOC';
-                        debug('Auto-login: not moderator. Actual role: ' + actualRole + '. Signing out.');
+                        debug('Auto-login: not manager. Actual role: ' + actualRole + '. Signing out.');
                         await signOut(auth);
                         debug('Signed out. Staying on current screen.');
                     }
@@ -251,7 +251,7 @@
                 await setDoc(doc(db, 'users', userCredential.user.uid), {
                     email: email,
                     displayName: displayName,
-                    role: 'moderator',
+                    role: 'manager',
                     createdAt: new Date().toISOString()
                 });
                 debug('Firestore doc created. Showing dashboard.');
@@ -288,13 +288,13 @@
                 const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
                 debug('Doc exists=' + userDoc.exists() + (userDoc.exists() ? ' role=' + userDoc.data().role : ''));
 
-                if (userDoc.exists() && userDoc.data().role === 'moderator') {
+                if (userDoc.exists() && userDoc.data().role === 'manager') {
                     debug('Moderator confirmed. Showing dashboard.');
                     showDashboard(userCredential.user, userDoc.data());
                 } else {
                     const actualRole = userDoc.exists() ? userDoc.data().role : 'NO DOC';
-                    debug('NOT moderator. Actual role: ' + actualRole);
-                    showMessage('liMessage', 'Access Denied. This account has role: ' + actualRole + ' (moderator required)', 'error');
+                    debug('NOT manager. Actual role: ' + actualRole);
+                    showMessage('liMessage', 'Access Denied. This account has role: ' + actualRole + ' (manager required)', 'error');
                     await signOut(auth);
                     debug('Signed out after access denied.');
                 }
