@@ -1,17 +1,16 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/screens/manage_employees_screen.dart';
-import 'package:task_tracker/screens/notifications_screen.dart';
+
 import 'package:task_tracker/screens/preset_items_screen.dart';
 import 'package:task_tracker/screens/problems_screen.dart';
 import 'package:task_tracker/screens/settings_screen.dart';
 import 'package:task_tracker/screens/task_detail_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
-import 'package:task_tracker/services/notification_service.dart';
+
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
 
@@ -252,32 +251,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
               ),
             ),
           ),
-          StreamBuilder<QuerySnapshot>(
-            stream: NotificationService().unreadCountStream(auth.currentUser?.email ?? ''),
-            builder: (context, snapshot) {
-              final count = snapshot.data?.docs.length ?? 0;
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
-                    onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const NotificationsScreen())),
-                  ),
-                  if (count > 0)
-                    Positioned(
-                      right: 6, top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red, shape: BoxShape.circle),
-                        child: Text('$count', style: const TextStyle(
-                            color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
+
           PopupMenuButton<String>(
             onSelected: (v) {
               if (v == 'employees') {
