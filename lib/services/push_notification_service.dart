@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:task_tracker/services/settings_service.dart';
 
 final FlutterLocalNotificationsPlugin _localNotifications =
     FlutterLocalNotificationsPlugin();
@@ -23,10 +24,15 @@ class PushNotificationService {
 
   NavigatorState? _navigator;
   ScaffoldMessengerState? _scaffoldMessenger;
+  SettingsService? _settings;
 
   void bindContext(NavigatorState nav, ScaffoldMessengerState snack) {
     _navigator = nav;
     _scaffoldMessenger = snack;
+  }
+
+  void bindSettings(SettingsService settings) {
+    _settings = settings;
   }
 
   Future<void> initialize() async {
@@ -99,6 +105,7 @@ class PushNotificationService {
   }
 
   void _onForegroundMessage(RemoteMessage message) {
+    if (_settings != null && !_settings!.notificationsEnabled) return;
     final notification = message.notification;
     if (notification == null) return;
 

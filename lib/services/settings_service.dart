@@ -8,12 +8,14 @@ class SettingsService extends ChangeNotifier {
   Color _accentColor = Brand.primary;
   List<Map<String, String>> _rememberedAccounts = [];
   String _currentRole = '';
+  bool _notificationsEnabled = true;
 
   String get language => _language;
   ThemeMode get themeMode => _themeMode;
   Color get accentColor => _accentColor;
   List<Map<String, String>> get rememberedAccounts => _rememberedAccounts;
   String get currentRole => _currentRole;
+  bool get notificationsEnabled => _notificationsEnabled;
   set currentRole(String role) {
     _currentRole = role;
     notifyListeners();
@@ -23,6 +25,7 @@ class SettingsService extends ChangeNotifier {
   static const _themeKey = 'theme';
   static const _accentKey = 'accent';
   static const _accountsKey = 'accounts';
+  static const _notifEnabledKey = 'notifications_enabled';
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -39,6 +42,7 @@ class SettingsService extends ChangeNotifier {
         return {'email': parts[0], 'name': parts[0]};
       })).toList();
     }
+    _notificationsEnabled = prefs.getBool(_notifEnabledKey) ?? true;
     notifyListeners();
   }
 
@@ -61,6 +65,13 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_accentKey, color.toARGB32());
+  }
+
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    _notificationsEnabled = enabled;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_notifEnabledKey, enabled);
   }
 
   Future<void> addAccount(String email, String name) async {
@@ -215,6 +226,8 @@ class SettingsService extends ChangeNotifier {
       'data': 'Data',
       'about': 'About',
       'check_for_updates': 'Check for Updates',
+      'push_notifications': 'Push Notifications',
+      'push_notifications_desc': 'Receive push notifications on this device',
       'checking_for_updates': 'Checking for updates...',
       'account_not_configured': 'Account Not Configured',
       'contact_administrator': 'Contact your administrator to set up your account.',
@@ -383,6 +396,8 @@ class SettingsService extends ChangeNotifier {
       'data': 'Données',
       'about': 'À propos',
       'check_for_updates': 'Vérifier les mises à jour',
+      'push_notifications': 'Notifications push',
+      'push_notifications_desc': 'Recevoir les notifications push sur cet appareil',
       'checking_for_updates': 'Vérification des mises à jour...',
       'account_not_configured': 'Compte non configuré',
       'contact_administrator': 'Contactez votre administrateur pour configurer votre compte.',
@@ -551,6 +566,8 @@ class SettingsService extends ChangeNotifier {
       'data': 'البيانات',
       'about': 'حول',
       'check_for_updates': 'التحقق من التحديثات',
+      'push_notifications': 'إشعارات الدفع',
+      'push_notifications_desc': 'استقبال إشعارات الدفع على هذا الجهاز',
       'checking_for_updates': 'جاري التحقق من التحديثات...',
       'account_not_configured': 'الحساب غير مكون',
       'contact_administrator': 'اتصل بمسؤولك لإعداد حسابك.',

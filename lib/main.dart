@@ -271,6 +271,9 @@ class _AppWithSettings extends StatelessWidget {
               navigatorKey.currentState!,
               scaffoldKey.currentState!,
             );
+            PushNotificationService().bindSettings(
+              context.read<SettingsService>(),
+            );
           });
           return const AuthGate();
         },

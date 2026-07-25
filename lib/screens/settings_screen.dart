@@ -170,6 +170,18 @@ class SettingsScreen extends StatelessWidget {
           ],
           const Divider(),
           _section(t('about')),
+          SwitchListTile(
+            secondary: Icon(
+              settings.notificationsEnabled
+                  ? Icons.notifications_active
+                  : Icons.notifications_off,
+              color: settings.notificationsEnabled ? settings.accentColor : Colors.grey,
+            ),
+            title: Text(t('push_notifications')),
+            subtitle: Text(t('push_notifications_desc')),
+            value: settings.notificationsEnabled,
+            onChanged: (val) => settings.setNotificationsEnabled(val),
+          ),
           ListTile(
             leading: const Icon(Icons.system_update_outlined),
             title: Text(t('check_for_updates')),
