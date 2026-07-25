@@ -38,4 +38,18 @@ class UserService {
       });
     }
   }
+
+  Future<String> getDisplayName(String email) async {
+    try {
+      final snap = await _db.collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+      if (snap.docs.isNotEmpty) {
+        final name = snap.docs.first.data()['displayName'] as String?;
+        if (name != null && name.isNotEmpty) return name;
+      }
+    } catch (_) {}
+    return email.split('@').first;
+  }
 }

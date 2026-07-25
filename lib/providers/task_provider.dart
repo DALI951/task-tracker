@@ -9,13 +9,19 @@ import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/services/firestore_service.dart';
 import 'package:task_tracker/services/notification_service.dart';
+import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/storage_service.dart';
+import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
 class TaskProvider extends ChangeNotifier {
   final FirestoreService _firestore = FirestoreService();
   final StorageService _storage = StorageService();
   final NotificationService _notif = NotificationService();
+  final UserService _userService = UserService();
+
+  SettingsService? _settings;
+  void attachSettings(SettingsService settings) => _settings = settings;
 
   List<AppTask> _tasks = [];
   List<AppTask> _pendingReview = [];
@@ -32,6 +38,8 @@ class TaskProvider extends ChangeNotifier {
   StreamSubscription? _problemSub;
   StreamSubscription? _employeeSub;
   StreamSubscription? _itemSub;
+
+  String _t(String key) => _settings?.t(key) ?? key;
 
   List<AppTask> get tasks => _tasks;
   List<AppTask> get pendingReview => _pendingReview;
@@ -262,8 +270,8 @@ class TaskProvider extends ChangeNotifier {
       _notif.send(
         recipientEmail: assignedToEmail,
         type: 'task_assigned',
-        title: 'New Task Assigned',
-        message: '"$title" has been assigned to you',
+        title: _t('notify_task_assigned'),
+        message: '"$title" ${_t('notif_task_assigned_msg')}',
         relatedId: task.id,
       );
       return true;
@@ -321,8 +329,8 @@ class TaskProvider extends ChangeNotifier {
         _notif.send(
           recipientEmail: task.createdBy,
           type: 'task_started',
-          title: 'Task Started',
-          message: '$userName started working on "${task.title}"',
+          title: _t('notify_task_started'),
+          message: '${_t('notif_task_started_msg')} "${task.title}"'.replaceAll('{name}', userName),
           relatedId: taskId,
         );
       }
@@ -350,13 +358,13 @@ class TaskProvider extends ChangeNotifier {
       _addHistory(taskId, 'submitted_proof', user.displayName ?? user.email ?? '');
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
       if (task != null) {
-        _notif.send(
-          recipientEmail: task.createdBy,
-          type: 'task_submitted',
-          title: 'Task Submitted for Review',
-          message: '${user.displayName ?? 'Unknown'} submitted "${task.title}" for review',
-          relatedId: taskId,
-        );
+      _notif.send(
+        recipientEmail: task.createdBy,
+        type: 'task_submitted',
+        title: _t('notify_task_submitted'),
+        message: '${_t('notif_task_submitted_msg')} "${task.title}"'.replaceAll('{name}', user.displayName ?? user.email?.split('@').first ?? 'Unknown'),
+        relatedId: taskId,
+      );
       }
       return true;
     } catch (e) {
@@ -378,8 +386,8 @@ class TaskProvider extends ChangeNotifier {
         _notif.send(
           recipientEmail: task.assignedToEmail,
           type: 'task_approved',
-          title: 'Task Approved',
-          message: '"${task.title}" has been approved',
+          title: _t('notify_task_approved'),
+          message: '"${task.title}" ${_t('notif_task_approved_msg')}',
           relatedId: taskId,
         );
       }
@@ -405,8 +413,8 @@ class TaskProvider extends ChangeNotifier {
         _notif.send(
           recipientEmail: task.assignedToEmail,
           type: 'task_rejected',
-          title: 'Task Rejected',
-          message: '"${task.title}" was rejected${reason != null ? ': $reason' : ''}',
+          title: _t('notify_task_rejected'),
+          message: '"${task.title}" ${_t('notif_task_rejected_msg')}',
           relatedId: taskId,
         );
       }
@@ -433,8 +441,8 @@ class TaskProvider extends ChangeNotifier {
       _notif.send(
         recipientEmail: newEmail,
         type: 'task_assigned',
-        title: 'Task Reassigned',
-        message: 'You have been assigned a task',
+        title: _t('notify_task_reassigned'),
+        message: _t('notif_task_reassigned_msg'),
         relatedId: taskId,
       );
       return true;
@@ -590,8 +598,8 @@ class TaskProvider extends ChangeNotifier {
       });
       _notif.sendToManagers(
         type: 'problem_reported',
-        title: 'Problem Reported',
-        message: '$reporterName reported a problem: ${description.length > 50 ? description.substring(0, 50) + '...' : description}',
+        title: _t('notify_problem_reported'),
+        message: _t('notif_problem_reported_msg').replaceAll('{name}', reporterName),
       );
       return true;
     } catch (e) {
@@ -612,8 +620,8 @@ class TaskProvider extends ChangeNotifier {
         _notif.send(
           recipientEmail: problem.reportedBy,
           type: 'problem_converted',
-          title: 'Problem Resolved',
-          message: 'Your reported problem has been resolved',
+          title: _t('notify_problem_resolved'),
+          message: _t('notif_problem_resolved_msg'),
           relatedId: taskId,
         );
       }
@@ -636,8 +644,8 @@ class TaskProvider extends ChangeNotifier {
         _notif.send(
           recipientEmail: problem.reportedBy,
           type: 'problem_converted',
-          title: 'Problem Converted to Task',
-          message: 'Your reported problem has been converted to a task',
+          title: _t('notify_problem_converted'),
+          message: _t('notif_problem_converted_msg'),
           relatedId: taskId,
         );
       }
