@@ -37,12 +37,9 @@
         .dashboard-info .value { font-size: 15px; color: #1a1a1a; font-weight: 500; margin-top: 2px; }
         .section-title { font-size: 13px; font-weight: 700; color: #666; margin: 20px 0 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         .divider { height: 1px; background: #eee; margin: 20px 0; }
-        #debug { display: none; }
     </style>
 </head>
 <body>
-    <div id="debug">Starting...</div>
-
     <div class="card">
         <!-- Sign Up Screen -->
         <div id="signupScreen">
@@ -51,7 +48,7 @@
                     <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                 </div>
                 <h1>Create Account</h1>
-                <p>Register as a manager</p>
+                <p>Register as a moderator</p>
             </div>
             <div class="form-group">
                 <label>Email</label>
@@ -112,7 +109,7 @@
             </div>
             <div class="dashboard-info">
                 <div class="label">Role</div>
-                <div class="value">Moderator</div>
+                <div class="value" id="dashRole"></div>
             </div>
 
             <div class="divider"></div>
@@ -139,16 +136,8 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
-
-        function debug(msg) {
-            const el = document.getElementById('debug');
-            el.textContent = msg;
-            console.log('[MOD]', msg);
-        }
-
-        debug('Initializing Firebase...');
 
         const firebaseConfig = {
             apiKey: "AIzaSyCq3-FOmjHuQH86QfA5Vf7c8hyneS0nbC0",
@@ -163,25 +152,14 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        debug('Firebase ready. Waiting for auth...');
-
         function showScreen(id) {
-            debug('showScreen: ' + id);
             document.getElementById('signupScreen').classList.add('hidden');
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('dashboardScreen').classList.add('hidden');
             document.getElementById(id).classList.remove('hidden');
         }
 
-        function showDashboard(user, userData) {
-            debug('showDashboard: ' + user.email);
-            document.getElementById('dashEmail').textContent = user.email;
-            document.getElementById('dashEmailValue').textContent = user.email;
-            document.getElementById('dashName').textContent = userData.displayName || user.email;
-            showScreen('dashboardScreen');
-        }
-
-        function showMessage(elId, text, type) {
+        function showMsg(elId, text, type) {
             const el = document.getElementById(elId);
             el.className = 'message ' + type;
             el.textContent = text;
@@ -190,52 +168,17 @@
 
         window.showScreen = showScreen;
 
-        let initialAuthCheckDone = false;
-
-        onAuthStateChanged(auth, async (user) => {
-            debug('onAuthStateChanged: user=' + (user ? user.email : 'null') + ' initialCheckDone=' + initialAuthCheckDone);
-
-            if (initialAuthCheckDone) {
-                debug('Skipping (already handled initial auth)');
-                return;
-            }
-            initialAuthCheckDone = true;
-
-            if (user) {
-                debug('Found existing user: ' + user.email + ' uid=' + user.uid);
-                try {
-                    const userDoc = await getDoc(doc(db, 'users', user.uid));
-                    debug('Doc exists=' + userDoc.exists() + (userDoc.exists() ? ' role=' + userDoc.data().role : ''));
-                    if (userDoc.exists() && userDoc.data().role === 'manager') {
-                        showDashboard(user, userDoc.data());
-                    } else {
-                        const actualRole = userDoc.exists() ? userDoc.data().role : 'NO DOC';
-                        debug('Auto-login: not manager. Actual role: ' + actualRole + '. Signing out.');
-                        await signOut(auth);
-                        debug('Signed out. Staying on current screen.');
-                    }
-                } catch (e) {
-                    debug('Error reading doc: ' + e.message);
-                    await signOut(auth);
-                }
-            } else {
-                debug('No user signed in. Showing signup.');
-                showScreen('signupScreen');
-            }
-        });
-
         window.signUp = async function() {
-            debug('signUp clicked');
             const email = document.getElementById('suEmail').value.trim();
             const password = document.getElementById('suPassword').value;
             const displayName = document.getElementById('suName').value.trim();
 
             if (!email || !password || !displayName) {
-                showMessage('suMessage', 'All fields are required', 'error');
+                showMsg('suMessage', 'All fields are required', 'error');
                 return;
             }
             if (password.length < 6) {
-                showMessage('suMessage', 'Password must be at least 6 characters', 'error');
+                showMsg('suMessage', 'Password must be at least 6 characters', 'error');
                 return;
             }
 
@@ -244,34 +187,31 @@
             btn.textContent = 'Creating...';
 
             try {
-                debug('Creating user: ' + email);
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                debug('User created uid=' + userCredential.user.uid);
-
-                await setDoc(doc(db, 'users', userCredential.user.uid), {
+                const cred = await createUserWithEmailAndPassword(auth, email, password);
+                await setDoc(doc(db, 'users', cred.user.uid), {
                     email: email,
                     displayName: displayName,
                     role: 'manager',
                     createdAt: new Date().toISOString()
                 });
-                debug('Firestore doc created. Showing dashboard.');
-
-                showDashboard(userCredential.user, { displayName, email });
+                document.getElementById('dashEmail').textContent = email;
+                document.getElementById('dashEmailValue').textContent = email;
+                document.getElementById('dashName').textContent = displayName;
+                document.getElementById('dashRole').textContent = 'Manager';
+                showScreen('dashboardScreen');
             } catch (e) {
-                debug('SignUp error: ' + e.message);
-                showMessage('suMessage', e.message || 'Failed to create account', 'error');
+                showMsg('suMessage', e.message || 'Failed to create account', 'error');
                 btn.disabled = false;
                 btn.textContent = 'Create Account';
             }
         };
 
         window.logIn = async function() {
-            debug('logIn clicked');
             const email = document.getElementById('liEmail').value.trim();
             const password = document.getElementById('liPassword').value;
 
             if (!email || !password) {
-                showMessage('liMessage', 'Email and password are required', 'error');
+                showMsg('liMessage', 'Email and password are required', 'error');
                 return;
             }
 
@@ -280,32 +220,26 @@
             btn.textContent = 'Signing in...';
 
             try {
-                debug('Signing in: ' + email);
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                debug('Signed in uid=' + userCredential.user.uid);
-
-                debug('Reading Firestore doc...');
-                const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-                debug('Doc exists=' + userDoc.exists() + (userDoc.exists() ? ' role=' + userDoc.data().role : ''));
+                const cred = await signInWithEmailAndPassword(auth, email, password);
+                const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
 
                 if (userDoc.exists() && userDoc.data().role === 'manager') {
-                    debug('Moderator confirmed. Showing dashboard.');
-                    showDashboard(userCredential.user, userDoc.data());
+                    document.getElementById('dashEmail').textContent = cred.user.email;
+                    document.getElementById('dashEmailValue').textContent = cred.user.email;
+                    document.getElementById('dashName').textContent = userDoc.data().displayName || cred.user.email;
+                    document.getElementById('dashRole').textContent = 'Manager';
+                    showScreen('dashboardScreen');
                 } else {
-                    const actualRole = userDoc.exists() ? userDoc.data().role : 'NO DOC';
-                    debug('NOT manager. Actual role: ' + actualRole);
-                    showMessage('liMessage', 'Access Denied. This account has role: ' + actualRole + ' (manager required)', 'error');
+                    const role = userDoc.exists() ? userDoc.data().role : 'none';
+                    showMsg('liMessage', 'Access Denied. Your role is: ' + role + '. Manager access required.', 'error');
                     await signOut(auth);
-                    debug('Signed out after access denied.');
                 }
             } catch (e) {
-                debug('Login error: ' + e.message);
-                showMessage('liMessage', e.message || 'Failed to sign in', 'error');
+                showMsg('liMessage', e.message || 'Failed to sign in', 'error');
             }
 
             btn.disabled = false;
             btn.textContent = 'Log In';
-            debug('Button reset.');
         };
 
         window.changePassword = async function() {
@@ -314,15 +248,15 @@
             const confirm = document.getElementById('cpConfirm').value;
 
             if (!current || !newPass || !confirm) {
-                showMessage('cpMessage', 'All fields are required', 'error');
+                showMsg('cpMessage', 'All fields are required', 'error');
                 return;
             }
             if (newPass.length < 6) {
-                showMessage('cpMessage', 'New password must be at least 6 characters', 'error');
+                showMsg('cpMessage', 'New password must be at least 6 characters', 'error');
                 return;
             }
             if (newPass !== confirm) {
-                showMessage('cpMessage', 'New passwords do not match', 'error');
+                showMsg('cpMessage', 'New passwords do not match', 'error');
                 return;
             }
 
@@ -335,23 +269,24 @@
                 const credential = EmailAuthProvider.credential(user.email, current);
                 await reauthenticateWithCredential(user, credential);
                 await updatePassword(user, newPass);
-                showMessage('cpMessage', 'Password updated successfully', 'success');
+                showMsg('cpMessage', 'Password updated successfully', 'success');
                 document.getElementById('cpCurrent').value = '';
                 document.getElementById('cpNew').value = '';
                 document.getElementById('cpConfirm').value = '';
             } catch (e) {
-                showMessage('cpMessage', e.message || 'Failed to update password', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Update Password';
+                showMsg('cpMessage', e.message || 'Failed to update password', 'error');
             }
+
+            btn.disabled = false;
+            btn.textContent = 'Update Password';
         };
 
         window.signOutUser = async function() {
-            debug('Signing out user...');
             await signOut(auth);
-            debug('Signed out. Showing signup.');
             showScreen('signupScreen');
+            document.getElementById('suEmail').value = '';
+            document.getElementById('suPassword').value = '';
+            document.getElementById('suName').value = '';
         };
     </script>
 </body>
