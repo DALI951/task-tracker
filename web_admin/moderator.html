@@ -209,7 +209,8 @@
                     if (userDoc.exists() && userDoc.data().role === 'moderator') {
                         showDashboard(user, userDoc.data());
                     } else {
-                        debug('Not moderator, signing out silently');
+                        const actualRole = userDoc.exists() ? userDoc.data().role : 'NO DOC';
+                        debug('Auto-login: not moderator. Actual role: ' + actualRole + '. Signing out.');
                         await signOut(auth);
                         debug('Signed out. Staying on current screen.');
                     }
@@ -291,8 +292,9 @@
                     debug('Moderator confirmed. Showing dashboard.');
                     showDashboard(userCredential.user, userDoc.data());
                 } else {
-                    debug('NOT moderator. Showing access denied.');
-                    showMessage('liMessage', 'Access Denied. This account is not a moderator.', 'error');
+                    const actualRole = userDoc.exists() ? userDoc.data().role : 'NO DOC';
+                    debug('NOT moderator. Actual role: ' + actualRole);
+                    showMessage('liMessage', 'Access Denied. This account has role: ' + actualRole + ' (moderator required)', 'error');
                     await signOut(auth);
                     debug('Signed out after access denied.');
                 }
