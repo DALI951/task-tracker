@@ -70,6 +70,12 @@ class FcmSender {
             'title': title,
             'body': body,
           },
+          'android': {
+            'priority': 'high',
+            'notification': {
+              'channel_id': 'task_tracker_channel',
+            },
+          },
           if (data != null) 'data': data,
         },
       };
