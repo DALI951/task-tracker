@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/providers/task_provider.dart';
@@ -41,9 +42,10 @@ class _PresetItemsScreenState extends State<PresetItemsScreen> {
           ElevatedButton(
             onPressed: () {
               if (_ctrl.text.trim().isEmpty) return;
+              final email = FirebaseAuth.instance.currentUser?.email ?? '';
               context
                   .read<TaskProvider>()
-                  .addPresetItem(_ctrl.text.trim());
+                  .addPresetItem(_ctrl.text.trim(), email);
               _ctrl.clear();
               Navigator.pop(ctx);
             },

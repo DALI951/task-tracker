@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -358,6 +359,7 @@ class _AddPresetDialogState extends State<_AddPresetDialog> {
                       ? null
                       : _descCtrl.text.trim(),
                   requireCarOrThing: _reqCar,
+                  createdBy: FirebaseAuth.instance.currentUser?.email,
                 ));
             Navigator.pop(context);
           },

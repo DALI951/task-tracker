@@ -66,8 +66,11 @@ class FirestoreService {
     await _presetsRef.doc(id).delete();
   }
 
-  Stream<QuerySnapshot> get presetsStream {
-    return _presetsRef.orderBy('name').snapshots();
+  Stream<QuerySnapshot> presetsStream(String createdBy) {
+    return _presetsRef
+        .where('createdBy', isEqualTo: createdBy)
+        .orderBy('name')
+        .snapshots();
   }
 
   Future<void> addEmployee(String email, String name, String createdBy, {String? password}) async {
@@ -109,16 +112,19 @@ class FirestoreService {
     return doc.data() as Map<String, dynamic>?;
   }
 
-  Future<void> addPresetItem(String name) async {
-    await _presetItemsRef.add({'name': name});
+  Future<void> addPresetItem(String name, String createdBy) async {
+    await _presetItemsRef.add({'name': name, 'createdBy': createdBy});
   }
 
   Future<void> deletePresetItem(String id) async {
     await _presetItemsRef.doc(id).delete();
   }
 
-  Stream<QuerySnapshot> get presetItemsStream {
-    return _presetItemsRef.orderBy('name').snapshots();
+  Stream<QuerySnapshot> presetItemsStream(String createdBy) {
+    return _presetItemsRef
+        .where('createdBy', isEqualTo: createdBy)
+        .orderBy('name')
+        .snapshots();
   }
 
   Future<void> addProblem(Map<String, dynamic> data) async {

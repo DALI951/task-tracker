@@ -136,9 +136,9 @@ class TaskProvider extends ChangeNotifier {
         notifyListeners();
       },
     );
-    _listenPresets();
+    _listenPresets(email);
     _listenEmployees(email);
-    _listenPresetItems();
+    _listenPresetItems(email);
   }
 
   void listenToEmployeeTasks(String email) {
@@ -206,9 +206,9 @@ class TaskProvider extends ChangeNotifier {
     );
   }
 
-  void _listenPresets() {
+  void _listenPresets(String createdBy) {
     _presetSub?.cancel();
-    _presetSub = _firestore.presetsStream.listen((snapshot) {
+    _presetSub = _firestore.presetsStream(createdBy).listen((snapshot) {
       _presets = snapshot.docs.map((doc) {
         return PresetTask.fromMap(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();
@@ -234,9 +234,9 @@ class TaskProvider extends ChangeNotifier {
     });
   }
 
-  void _listenPresetItems() {
+  void _listenPresetItems(String createdBy) {
     _itemSub?.cancel();
-    _itemSub = _firestore.presetItemsStream.listen((snapshot) {
+    _itemSub = _firestore.presetItemsStream(createdBy).listen((snapshot) {
       _presetItems = snapshot.docs.map((doc) {
         return PresetItem.fromMap(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();
@@ -605,9 +605,9 @@ class TaskProvider extends ChangeNotifier {
     return await _firestore.getEmployee(email);
   }
 
-  Future<bool> addPresetItem(String name) async {
+  Future<bool> addPresetItem(String name, String createdBy) async {
     try {
-      await _firestore.addPresetItem(name);
+      await _firestore.addPresetItem(name, createdBy);
       return true;
     } catch (e) {
       _error = friendlyError(e);

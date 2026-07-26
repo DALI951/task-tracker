@@ -63,14 +63,18 @@ service cloud.firestore {
 
     match /preset_tasks/{id} {
       allow read: if isAuth();
-      allow write: if isAuth() && isManager(request.auth.uid);
+      allow create: if isAuth() && isManager(request.auth.uid);
+      allow update, delete: if isAuth() && isManager(request.auth.uid)
+        && resource.data.createdBy == userEmail();
     }
 
     // ─── Preset Items ─────────────────────────────────────────
 
     match /preset_items/{id} {
       allow read: if isAuth();
-      allow write: if isAuth() && isManager(request.auth.uid);
+      allow create: if isAuth() && isManager(request.auth.uid);
+      allow update, delete: if isAuth() && isManager(request.auth.uid)
+        && resource.data.createdBy == userEmail();
     }
 
     // ─── Problems ─────────────────────────────────────────────

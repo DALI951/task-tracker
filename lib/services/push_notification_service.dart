@@ -39,6 +39,7 @@ class PushNotificationService {
     if (kIsWeb) return;
 
     await _requestPermission();
+    await _createNotificationChannel();
     await _initLocalNotifications();
     await _saveToken();
 
@@ -69,6 +70,18 @@ class PushNotificationService {
       provisional: false,
     );
     debugPrint('FCM permission: ${settings.authorizationStatus}');
+  }
+
+  Future<void> _createNotificationChannel() async {
+    const channel = AndroidNotificationChannel(
+      'task_tracker_channel',
+      'Task Notifications',
+      description: 'Notifications for task updates',
+      importance: Importance.high,
+    );
+    final androidPlugin = _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(channel);
   }
 
   Future<void> _initLocalNotifications() async {
