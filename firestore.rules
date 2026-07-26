@@ -21,19 +21,20 @@ service cloud.firestore {
     // ─── Users ────────────────────────────────────────────────
 
     match /users/{uid} {
-      // Owner can read/write their own doc
       allow read, write: if isAuth() && request.auth.uid == uid;
-      // Managers can read all user docs (for admin dashboard)
       allow read: if isAuth() && isManager(request.auth.uid);
-      // All auth'd users can read other user docs (needed for FCM token lookup)
       allow read: if isAuth();
     }
 
     // ─── Tasks ────────────────────────────────────────────────
 
     match /tasks/{taskId} {
-      // Managers: full access
-      allow read, write: if isAuth() && isManager(request.auth.uid);
+      // Managers: create tasks they own
+      allow create: if isAuth() && isManager(request.auth.uid);
+
+      // Managers: read/update/delete their own tasks
+      allow read, update, delete: if isAuth() && isManager(request.auth.uid)
+        && resource.data.createdBy == userEmail();
 
       // Employees: read tasks assigned to their email
       allow read: if isAuth() &&
@@ -50,7 +51,12 @@ service cloud.firestore {
     // ─── Employees (manager directory) ────────────────────────
 
     match /employees/{email} {
-      allow read, write: if isAuth() && isManager(request.auth.uid);
+      // Managers: create employees
+      allow create: if isAuth() && isManager(request.auth.uid);
+
+      // Managers: read/update/delete their own employees
+      allow read, update, delete: if isAuth() && isManager(request.auth.uid)
+        && resource.data.createdBy == userEmail();
     }
 
     // ─── Preset Tasks ─────────────────────────────────────────

@@ -23,8 +23,12 @@ class FirestoreService {
     await _tasksRef.doc(taskId).delete();
   }
 
-  Future<List<AppTask>> getAllTasksOnce() async {
-    final snap = await _tasksRef.orderBy('createdAt', descending: true).get();
+  Future<List<AppTask>> getAllTasksOnce({String? createdBy}) async {
+    Query q = _tasksRef;
+    if (createdBy != null) {
+      q = q.where('createdBy', isEqualTo: createdBy);
+    }
+    final snap = await q.get();
     return snap.docs.map((doc) => AppTask.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList();
   }
 
@@ -35,8 +39,10 @@ class FirestoreService {
     return snap.docs.map((doc) => AppTask.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList();
   }
 
-  Stream<QuerySnapshot> get allTasksStream {
-    return _tasksRef.orderBy('createdAt', descending: true).snapshots();
+  Stream<QuerySnapshot> allTasksStream(String createdBy) {
+    return _tasksRef
+        .where('createdBy', isEqualTo: createdBy)
+        .snapshots();
   }
 
   Stream<QuerySnapshot> tasksForEmployee(String email) {
@@ -45,10 +51,10 @@ class FirestoreService {
         .snapshots();
   }
 
-  Stream<QuerySnapshot> get pendingReviewStream {
+  Stream<QuerySnapshot> pendingReviewStream(String createdBy) {
     return _tasksRef
+        .where('createdBy', isEqualTo: createdBy)
         .where('status', isEqualTo: 'pending_review')
-        .orderBy('createdAt', descending: true)
         .snapshots();
   }
 
@@ -91,8 +97,10 @@ class FirestoreService {
     await _employeesRef.doc(email).delete();
   }
 
-  Stream<QuerySnapshot> get employeesStream {
-    return _employeesRef.orderBy('name').snapshots();
+  Stream<QuerySnapshot> employeesStream(String createdBy) {
+    return _employeesRef
+        .where('createdBy', isEqualTo: createdBy)
+        .snapshots();
   }
 
   Future<Map<String, dynamic>?> getEmployee(String email) async {

@@ -4,11 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 class UserService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Future<void> setRole(String uid, String role) async {
+  Future<void> setRole(String uid, String role, {String? email}) async {
     await _db.collection('users').doc(uid).set({
       'role': role,
-      'email': FirebaseAuth.instance.currentUser?.email ?? '',
-    });
+      'email': email ?? FirebaseAuth.instance.currentUser?.email ?? '',
+    }, SetOptions(merge: true));
   }
 
   Future<String?> getRole(String uid) async {

@@ -113,7 +113,14 @@ class TaskProvider extends ChangeNotifier {
     _tasks = [];
     _error = null;
     notifyListeners();
-    _taskSub = _firestore.allTasksStream.listen(
+    final email = FirebaseAuth.instance.currentUser?.email;
+    if (email == null) {
+      _loading = false;
+      _error = 'Not signed in';
+      notifyListeners();
+      return;
+    }
+    _taskSub = _firestore.allTasksStream(email).listen(
       (snapshot) {
         _tasks = _sortTasks(snapshot.docs.map((doc) {
           return AppTask.fromMap(doc.data() as Map<String, dynamic>, doc.id);
@@ -130,7 +137,7 @@ class TaskProvider extends ChangeNotifier {
       },
     );
     _listenPresets();
-    _listenEmployees();
+    _listenEmployees(email);
     _listenPresetItems();
   }
 
@@ -167,7 +174,9 @@ class TaskProvider extends ChangeNotifier {
 
   void listenToPendingReview() {
     _reviewSub?.cancel();
-    _reviewSub = _firestore.pendingReviewStream.listen(
+    final email = FirebaseAuth.instance.currentUser?.email;
+    if (email == null) return;
+    _reviewSub = _firestore.pendingReviewStream(email).listen(
       (snapshot) {
         _pendingReview = snapshot.docs.map((doc) {
           return AppTask.fromMap(doc.data() as Map<String, dynamic>, doc.id);
@@ -211,9 +220,9 @@ class TaskProvider extends ChangeNotifier {
     });
   }
 
-  void _listenEmployees() {
+  void _listenEmployees(String createdBy) {
     _employeeSub?.cancel();
-    _employeeSub = _firestore.employeesStream.listen((snapshot) {
+    _employeeSub = _firestore.employeesStream(createdBy).listen((snapshot) {
       _employees = snapshot.docs
           .map((doc) => doc.data() as Map<String, dynamic>)
           .toList();
@@ -310,6 +319,17 @@ class TaskProvider extends ChangeNotifier {
         'approvedBy': user.email,
       });
       _addHistory(taskId, 'approved', user.displayName ?? user.email ?? '');
+      final task = _tasks.where((t) => t.id == taskId).firstOrNull;
+      if (task != null) {
+        _notif.send(
+          recipientEmail: task.assignedToEmail,
+          type: 'task_approved',
+          title: _t('notify_task_approved'),
+          message: '"${task.title}" ${_t('notif_task_approved_msg')}',
+          relatedId: taskId,
+          senderName: await _userService.getDisplayName(user.email ?? ''),
+        );
+      }
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -470,6 +490,17 @@ class TaskProvider extends ChangeNotifier {
         'completedAt': null,
       });
       _addHistory(taskId, 'reset', '');
+      final task = _tasks.where((t) => t.id == taskId).firstOrNull;
+      if (task != null) {
+        _notif.send(
+          recipientEmail: task.assignedToEmail,
+          type: 'task_status_changed',
+          title: _t('notify_task_status_changed'),
+          message: '"${task.title}" ${_t('notif_task_status_changed_msg')}',
+          relatedId: taskId,
+          senderName: '',
+        );
+      }
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -484,6 +515,17 @@ class TaskProvider extends ChangeNotifier {
       if (newStatus == 'completed') updates['completedAt'] = DateTime.now();
       await _firestore.updateTask(taskId, updates);
       _addHistory(taskId, 'status_change', newStatus);
+      final task = _tasks.where((t) => t.id == taskId).firstOrNull;
+      if (task != null) {
+        _notif.send(
+          recipientEmail: task.assignedToEmail,
+          type: 'task_status_changed',
+          title: _t('notify_task_status_changed'),
+          message: '"${task.title}" → $newStatus',
+          relatedId: taskId,
+          senderName: '',
+        );
+      }
       return true;
     } catch (e) {
       _error = friendlyError(e);
