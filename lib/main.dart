@@ -12,7 +12,6 @@ import 'package:task_tracker/services/push_notification_service.dart';
 import 'package:task_tracker/services/session_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
-import 'package:task_tracker/utils/connectivity.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> scaffoldKey =
@@ -84,11 +83,6 @@ class TaskTrackerApp extends StatelessWidget {
           s.load();
           return s;
         }),
-        ChangeNotifierProvider(create: (_) {
-          final c = ConnectivityProvider();
-          c.start();
-          return c;
-        }),
       ],
       child: Builder(
         builder: (context) {
@@ -100,41 +94,11 @@ class TaskTrackerApp extends StatelessWidget {
             });
             final settings = context.read<SettingsService>();
             context.read<TaskProvider>().attachSettings(settings);
-            _listenConnectivity(context);
           });
           return const _AppWithSettings();
         },
       ),
     );
-  }
-
-  bool _lastOnline = true;
-
-  void _listenConnectivity(BuildContext context) {
-    final connectivity = context.read<ConnectivityProvider>();
-    connectivity.addListener(() {
-      if (!context.mounted) return;
-      final online = connectivity.online;
-      if (_lastOnline && !online) {
-        scaffoldKey.currentState?.showSnackBar(
-          const SnackBar(
-            content: Text('You are offline. Changes will sync when connection is restored.'),
-            duration: Duration(days: 1),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      } else if (!_lastOnline && online) {
-        scaffoldKey.currentState?.hideCurrentSnackBar();
-        scaffoldKey.currentState?.showSnackBar(
-          const SnackBar(
-            content: Text('Back online'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-      _lastOnline = online;
-    });
   }
 }
 

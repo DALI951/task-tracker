@@ -41,6 +41,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           name,
         );
     if (mounted) toast(context, ok ? t('task_started') : context.read<TaskProvider>().error ?? 'Failed');
+    if (ok && mounted) Navigator.pop(context);
   }
 
   Future<void> _pickAndSubmitProof() async {

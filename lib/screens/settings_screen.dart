@@ -16,7 +16,7 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.read<SettingsService>();
+    final settings = context.watch<SettingsService>();
     final t = settings.t;
 
     return Scaffold(
@@ -32,30 +32,21 @@ class SettingsScreen extends StatelessWidget {
             trailing: settings.language == 'en'
                 ? Icon(Icons.check, color: settings.accentColor)
                 : null,
-            onTap: () async {
-              await settings.setLanguage('en');
-              if (context.mounted) Navigator.pop(context);
-            },
+            onTap: () => settings.setLanguage('en'),
           ),
           ListTile(
             title: const Text('Français'),
             trailing: settings.language == 'fr'
                 ? Icon(Icons.check, color: settings.accentColor)
                 : null,
-            onTap: () async {
-              await settings.setLanguage('fr');
-              if (context.mounted) Navigator.pop(context);
-            },
+            onTap: () => settings.setLanguage('fr'),
           ),
           ListTile(
             title: const Text('العربية'),
             trailing: settings.language == 'ar'
                 ? Icon(Icons.check, color: settings.accentColor)
                 : null,
-            onTap: () async {
-              await settings.setLanguage('ar');
-              if (context.mounted) Navigator.pop(context);
-            },
+            onTap: () => settings.setLanguage('ar'),
           ),
           const Divider(),
           _section(t('theme')),
@@ -64,20 +55,14 @@ class SettingsScreen extends StatelessWidget {
             trailing: settings.themeMode == ThemeMode.light
                 ? Icon(Icons.check, color: settings.accentColor)
                 : null,
-            onTap: () async {
-              await settings.setThemeMode(ThemeMode.light);
-              if (context.mounted) Navigator.pop(context);
-            },
+            onTap: () => settings.setThemeMode(ThemeMode.light),
           ),
           ListTile(
             title: Text(t('dark')),
             trailing: settings.themeMode == ThemeMode.dark
                 ? Icon(Icons.check, color: settings.accentColor)
                 : null,
-            onTap: () async {
-              await settings.setThemeMode(ThemeMode.dark);
-              if (context.mounted) Navigator.pop(context);
-            },
+            onTap: () => settings.setThemeMode(ThemeMode.dark),
           ),
           const Divider(),
           _section(t('accent_color')),
@@ -98,10 +83,7 @@ class SettingsScreen extends StatelessWidget {
               ].map((c) {
                 final isSelected = settings.accentColor == c;
                 return GestureDetector(
-                  onTap: () async {
-                    await settings.setAccentColor(c);
-                    if (context.mounted) Navigator.pop(context);
-                  },
+                  onTap: () => settings.setAccentColor(c),
                   child: Container(
                     width: 40,
                     height: 40,
