@@ -1,332 +1,380 @@
-# Task Tracker
+<div align="center">
 
-Enterprise task tracker with photo proof of completion. Single unified Flutter app with role-based UI for **Managers** and **Employees**.
+# ✅ Task Tracker
 
-## Overview
+**Enterprise task management with photo proof of completion.**
 
-| | |
-|---|---|
-| **Version** | 0.2.2 |
-| **Flutter** | 3.44.8+ |
-| **Backend** | Firebase (Auth + Firestore + FCM) |
-| **Platforms** | Android APK, Web (GitHub Pages), Windows Desktop |
-| **Languages** | English, French, Arabic (RTL) |
+A unified Flutter app with role-based UI for **Managers** and **Employees** — assign tasks, track progress, verify with photos, and get notified in real time.
 
 ---
 
-## Features
+[![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
+[![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)]()
+[![Web](https://img.shields.io/badge/Web-GitHub%20Pages-222222?style=for-the-badge&logo=githubpages&logoColor=white)]()
+[![Windows](https://img.shields.io/badge/Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)]()
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)]()
 
-- **Role-based UI** — Managers create/manage tasks; Employees view, claim, and complete with photo proof
-- **Photo proof of completion** — Camera capture on Android, gallery on web/desktop
-- **Task lifecycle** — Pending → In Progress → Pending Review → Approved/Rejected
-- **Problem reporting** — Employees report problems; managers convert them to tasks
-- **Push notifications** — FCM v1 via service account, per-type toggles, notification preferences
-- **Auto-update** — Checks GitHub Releases on startup, downloads APK via in-app prompt
-- **Preset templates** — Reusable task templates and item lists, scoped per manager
-- **Multi-language** — EN/FR/AR with RTL support
-- **Theme** — Light/dark mode, configurable accent color
-- **Data isolation** — Each manager only sees their own tasks, employees, and presets
+<br>
+
+**Version 0.2.2** · **EN / FR / AR** · **Dark Mode** · **Push Notifications** · **Auto-Update**
+
+</div>
 
 ---
 
-## Architecture
+## ✨ Highlights
+
+<table>
+<tr>
+<td width="50%">
+
+### 👨‍💼 Manager Features
+- Create & assign tasks from **presets** or custom
+- **Approve or reject** completions with photo proof
+- Manage employees, preset templates, and item lists
+- View problems reported by employees
+- Convert problems into tasks
+- Full data isolation — only see **your own** data
+
+</td>
+<td width="50%">
+
+### 👷 Employee Features
+- View assigned tasks with **search & filters**
+- **Claim** a task → work on it → **submit photo proof**
+- Report problems with optional photo
+- Real-time **push notifications**
+- Notification preferences with per-type toggles
+- Multi-language support (EN/FR/AR + RTL)
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🔄 Task Lifecycle
+
+```
+┌──────────┐     ┌──────────┐     ┌────────────────┐     ┌──────────┐
+│  Pending  │────▶│    Doing  │────▶│ Pending Review  │────▶│ Completed│
+└──────────┘     └──────────┘     └────────────────┘     └──────────┘
+                       ▲                    │
+                       │         ┌──────────┘
+                       └─────────┘  (rejected → back to doing)
+```
+
+| Status | Meaning |
+|--------|---------|
+| 🟠 `Pending` | Task created, waiting for an employee to claim |
+| 🔵 `Doing` | Employee has started working on the task |
+| 🟣 `Pending Review` | Photo proof submitted, waiting for manager approval |
+| 🟢 `Completed` | Manager approved the completion |
+| 🔴 `Rejected` | Manager rejected the proof (returns to Doing) |
+
+---
+
+## 📱 Platform Support
+
+| Platform | Camera | Auto-Update | Push Notifications | Installer |
+|----------|--------|-------------|-------------------|-----------|
+| 🤖 Android | ✅ Direct capture | ✅ In-app download | ✅ FCM v1 | APK sideload |
+| 🌐 Web | ❌ Gallery only | ❌ | ✅ In-app only | GitHub Pages |
+| 🖥️ Windows | ❌ Gallery only | ❌ | ❌ | Inno Setup `.exe` |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Flutter `3.44+`
+- Firebase project with Auth, Firestore, and FCM enabled
+- Android Studio or VS Code
+
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/DALI951/task-tracker.git
+cd task-tracker
+flutter pub get
+```
+
+### 2. Firebase Setup
+
+Place your `google-services.json` in `android/app/` and `lib/firebase_options.dart` should already be configured.
+
+### 3. Run
+
+```bash
+# Android
+flutter run --release
+
+# Web
+flutter run -d chrome --release
+
+# Windows
+flutter run -d windows --release
+```
+
+### 4. Create Accounts
+
+Open the [Admin Panel](https://dali951.github.io/task-tracker/admin/index.html) → enter passphrase `tasktracker2024` → create manager/employee accounts.
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                   main.dart                      │
+│         Splash → Firebase Init → AuthGate        │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│  ┌──────────────┐    ┌──────────────────────┐   │
+│  │  TaskProvider │    │   SettingsService     │   │
+│  │  (ChangeNotif)│    │   (ChangeNotifier)    │   │
+│  └──────┬───────┘    └──────────┬───────────┘   │
+│         │                       │                │
+│  ┌──────▼───────┐    ┌──────────▼───────────┐   │
+│  │FirestoreSvc  │    │  AuthService         │   │
+│  │NotificationSvc│   │  UserService         │   │
+│  │StorageService│    │  SessionService      │   │
+│  └──────────────┘    │  PushNotificationSvc │   │
+│                      │  UpdateService       │   │
+│                      └──────────────────────┘   │
+├─────────────────────────────────────────────────┤
+│                   Firebase                       │
+│          Auth · Firestore · FCM                  │
+└─────────────────────────────────────────────────┘
+```
 
 ### State Management
 
-`ChangeNotifier` + `Provider`. Single `TaskProvider` handles tasks, employees, presets, and problems.
+**`ChangeNotifier` + `Provider`** — single `TaskProvider` handles all app state (tasks, employees, presets, problems). Streams from Firestore auto-update the UI in real time.
 
-### Project Structure
+### Auth Flow
+
+```
+No user? → LoginScreen
+Has user? → Read role from Firestore
+  ├─ Manager   → ManagerDashboard (tasks + problems tabs)
+  ├─ Employee  → EmployeeTasksScreen (task list + search)
+  └─ No role   → Auto-provision as employee
+```
+
+---
+
+## 📁 Project Structure
+
+<details>
+<summary><strong>lib/</strong> — Flutter source code</summary>
 
 ```
 lib/
-├── main.dart                    # Entry point, providers, auth gate, splash
+├── main.dart                         # Entry, providers, splash screen
 ├── config/
-│   └── brand.dart               # Colors, radii, brand constants
+│   └── brand.dart                    # Colors, radii, brand constants
 ├── models/
-│   ├── task.dart                # AppTask + HistoryEvent
-│   ├── problem.dart             # Problem model
-│   ├── preset_task.dart         # PresetTask template
-│   ├── preset_item.dart         # PresetItem template
-│   └── app_notification.dart    # Notification model
+│   ├── task.dart                     # AppTask + HistoryEvent
+│   ├── problem.dart                  # Problem model
+│   ├── preset_task.dart              # PresetTask template
+│   ├── preset_item.dart              # PresetItem template
+│   └── app_notification.dart         # Notification model
 ├── providers/
-│   └── task_provider.dart       # All state management
+│   └── task_provider.dart            # All state management
 ├── screens/
-│   ├── login_screen.dart        # Sign-in (no in-app sign-up)
-│   ├── manager_dashboard.dart   # Manager UI: tasks + problems tabs
-│   ├── employee_tasks_screen.dart  # Employee UI: task list + search
-│   ├── task_detail_screen.dart  # Task detail (shared, isManager flag)
+│   ├── login_screen.dart             # Sign-in
+│   ├── manager_dashboard.dart        # Manager: tasks + problems tabs
+│   ├── employee_tasks_screen.dart    # Employee: task list + search
+│   ├── task_detail_screen.dart       # Task detail (shared)
 │   ├── manage_employees_screen.dart  # Employee CRUD
-│   ├── problems_screen.dart     # Problem list / convert to task
-│   ├── report_problem_screen.dart  # Employee problem reporting
-│   ├── settings_screen.dart     # Theme, language, presets, notifications
-│   ├── notifications_screen.dart  # Notification list
+│   ├── problems_screen.dart          # Problem list / convert
+│   ├── report_problem_screen.dart    # Employee: report problem
+│   ├── settings_screen.dart          # Settings, presets, i18n
+│   ├── notifications_screen.dart     # Notification list
 │   ├── notification_preferences_screen.dart  # Per-type toggles
-│   ├── preset_items_screen.dart  # Preset item management
-│   └── update_modal.dart        # Update prompt modal
+│   ├── preset_items_screen.dart      # Preset item management
+│   └── update_modal.dart             # Update prompt
 ├── services/
-│   ├── auth_gate.dart           # Auth routing based on role
-│   ├── auth_service.dart        # Firebase Auth operations
-│   ├── firestore_service.dart   # Firestore CRUD
-│   ├── user_service.dart        # Role management
-│   ├── session_service.dart     # Manager credential storage
-│   ├── settings_service.dart    # Theme/language/i18n + all translations
-│   ├── notification_service.dart  # Firestore notifications CRUD + FCM push
-│   ├── push_notification_service.dart  # FCM token, foreground messages, local notifications
-│   ├── fcm_sender.dart          # FCM v1 HTTP push via service account
-│   ├── storage_service.dart     # Image encoding/storage
-│   └── update_service.dart      # GitHub Releases auto-update
+│   ├── auth_gate.dart                # Auth routing by role
+│   ├── auth_service.dart             # Firebase Auth
+│   ├── firestore_service.dart        # Firestore CRUD
+│   ├── user_service.dart             # Role management
+│   ├── session_service.dart          # Credential storage
+│   ├── settings_service.dart         # Theme/language/i18n
+│   ├── notification_service.dart     # Notifications CRUD
+│   ├── push_notification_service.dart # FCM + local notifications
+│   ├── fcm_sender.dart               # FCM v1 HTTP push
+│   ├── storage_service.dart          # Image encoding
+│   └── update_service.dart           # GitHub Releases auto-update
 ├── utils/
-│   ├── connectivity.dart        # (removed)
-│   ├── error_handler.dart       # Friendly error messages
-│   └── toast.dart               # Toast utility
+│   ├── error_handler.dart            # Friendly error messages
+│   └── toast.dart                    # Toast utility
 └── widgets/
-    └── task_card.dart           # Reusable task card widget
-
-web_admin/
-├── index.html                   # Admin account creation page
-└── moderator.html               # Moderator self-service page
-
-firestore.rules                  # Firestore security rules
+    └── task_card.dart                # Reusable task card
 ```
+
+</details>
+
+<details>
+<summary><strong>web_admin/</strong> — Account creation pages</summary>
+
+```
+web_admin/
+├── index.html          # Admin account creator (passphrase-gated)
+└── moderator.html      # Moderator self-service page
+```
+
+</details>
+
+<details>
+<summary><strong>firestore.rules</strong> — Security rules</summary>
+
+```
+firestore.rules        # Firestore security rules (data isolation)
+```
+
+</details>
 
 ---
 
-## Firebase Setup
-
-### Project
-
-- **Project ID**: `task-tracker-6d7e1`
-- **Plan**: Spark (free) — no Cloud Functions
-- **Config**: `lib/firebase_options.dart` (Android, iOS, Web)
+## 🔥 Firebase & Security
 
 ### Firestore Collections
 
-| Collection | Key Fields | Access |
-|---|---|---|
-| `users/{uid}` | `role`, `fcmToken`, `displayName` | Owner read/write; manager read |
-| `tasks/{id}` | `title`, `status`, `assignedToEmail`, `createdBy`, `photoUrl`, `history[]` | Manager: own tasks; Employee: assigned tasks |
-| `employees/{email}` | `email`, `name`, `createdBy` | Manager only (own employees) |
-| `preset_tasks/{id}` | `name`, `defaultDescription`, `requireCarOrThing`, `createdBy` | Manager: own presets; Employee: read |
-| `preset_items/{id}` | `name`, `createdBy` | Manager: own items; Employee: read |
-| `problems/{id}` | `reportedBy`, `description`, `status`, `convertedToTaskId` | Any auth'd user create/read; Manager update/delete |
-| `notifications/{notifId}` | `recipientEmail`, `type`, `title`, `message`, `read` | Recipient only |
+| Collection | Description | Access Control |
+|------------|-------------|----------------|
+| `users/{uid}` | User profiles, roles, FCM tokens | Owner + managers |
+| `tasks/{id}` | Tasks with full lifecycle + history | Manager (own) / Employee (assigned) |
+| `employees/{email}` | Employee directory | Manager only (own) |
+| `preset_tasks/{id}` | Reusable task templates | Manager (own) / Employee (read) |
+| `preset_items/{id}` | Reusable item lists | Manager (own) / Employee (read) |
+| `problems/{id}` | Reported problems | Any user create/read; Manager update/delete |
+| `notifications/{notifId}` | In-app notifications | Recipient only |
 
-### Firestore Rules
+### Data Isolation
 
-Security rules enforce data isolation:
+Each manager's data is scoped by `createdBy`:
 
-- Tasks, employees, presets are scoped by `createdBy == userEmail()` for managers
-- Employees can only read tasks assigned to their email
-- Employees can only update limited fields on their assigned tasks (status, claimedBy, photoUrl, etc.)
+- **Tasks** — managers only see tasks they created
+- **Employees** — managers only see employees they created
+- **Presets** — managers only see their own preset templates
+- **Problems** — any user can create; only managers can update
 
-See `firestore.rules` for the full ruleset.
-
----
-
-## Account Creation
-
-**No sign-up in the app.** Accounts are created via:
-
-1. **Web Admin** — `https://dali951.github.io/task-tracker/admin/index.html`
-   - Gated by admin passphrase: `tasktracker2024`
-   - Creates Firebase Auth user + Firestore `users/{uid}` doc
-   - Roles: Manager or Employee
-
-2. **Moderator Page** — `https://dali951.github.io/task-tracker/admin/moderator.html`
-   - Self-service for managers: sign up, log in, change password/display name
+Employees can only read tasks assigned to their email and update limited fields (status, photo, history).
 
 ---
 
-## App Behavior
+## 🔔 Push Notifications
 
-### Auth Flow (`auth_gate.dart`)
+Powered by **FCM v1 HTTP API** via service account — no Cloud Functions needed.
 
-1. No user → `LoginScreen`
-2. User exists → resolve role from Firestore `users/{uid}.role`
-3. Role cached in SharedPreferences (`role_{uid}`)
-4. Manager → `ManagerDashboard`
-5. Employee → `EmployeeTasksScreen`
-6. No role found → auto-provision as employee
+<details>
+<summary><strong>Notification types</strong></summary>
 
-### Manager Flow
+| Type | When | Recipient |
+|------|------|-----------|
+| `task_assigned` | Manager assigns task | Employee |
+| `task_started` | Employee claims task | Manager |
+| `task_submitted` | Employee submits proof | Manager |
+| `task_approved` | Manager approves | Employee |
+| `task_rejected` | Manager rejects | Employee |
+| `task_status_changed` | Any status change | Assigned employee |
+| `task_reassigned` | Task reassigned | New employee |
+| `problem_reported` | Employee reports problem | Managers |
+| `problem_resolved` | Problem converted to task | Reporter |
 
-- Dashboard with Tasks + Problems tabs
-- Create tasks (preset or custom), assign to employees
-- Review pending completions: approve or reject with reason
-- Manage employees, preset items, preset tasks
-- View problems reported by employees
+</details>
 
-### Employee Flow
+| Component | File | Role |
+|-----------|------|------|
+| Send push | `fcm_sender.dart` | Authenticates with Google APIs, sends to FCM v1 |
+| Receive | `push_notification_service.dart` | Foreground messages, local notifications, token save |
+| Preferences | `notification_preferences_screen.dart` | Per-type toggles |
 
-- Task list with search and filters (active/pending/in progress/completed)
-- Claim task → start working → submit photo proof
-- Report problems with optional photo
-- Settings, notification preferences
+---
 
-### Task Lifecycle
+## 🚢 CI/CD Pipeline
+
+Push to `master` → GitHub Actions builds everything automatically.
 
 ```
-pending → doing (employee claims)
-       → pending_review (employee submits proof)
-       → completed (manager approves)
-       → doing (manager rejects, back to employee)
+Push to master
+     │
+     ├──▶ build-apk ──────────┐
+     │                         ├──▶ create-release ──▶ GitHub Release
+     ├──▶ build-web ──────────┤        (APK + Web + Windows)
+     │                         │
+     ├──▶ deploy-web ─────────┘──▶ GitHub Pages
+     │
+     └──▶ build-windows ─────────┘
 ```
 
----
+| Job | What it does |
+|-----|-------------|
+| `build-apk` | Builds signed APK, uploads as artifact |
+| `build-web` | Builds web + copies admin pages, zips, uploads |
+| `deploy-web` | Deploys web build to GitHub Pages |
+| `build-windows` | Builds Windows installer |
+| `create-release` | Downloads all artifacts, creates GitHub Release |
 
-## Push Notifications
-
-FCM v1 HTTP API via service account (`assets/service-account.json`).
-
-- **Sending**: `fcm_sender.dart` authenticates with Google APIs, sends to FCM v1 endpoint
-- **Receiving**: `push_notification_service.dart` handles foreground messages, local notifications
-- **Token**: Stored in `users/{uid}.fcmToken`
-- **Channel**: `task_tracker_channel` (created at startup on Android)
-- **Permission**: `POST_NOTIFICATIONS` for Android 13+
-
-### Notification Types
-
-| Type | Trigger |
-|---|---|
-| `task_assigned` | Manager assigns task to employee |
-| `task_started` | Employee claims/starts task |
-| `task_submitted` | Employee submits proof for review |
-| `task_approved` | Manager approves completed task |
-| `task_rejected` | Manager rejects completed task |
-| `task_status_changed` | Task status updated |
-| `task_reassigned` | Task reassigned to different employee |
-| `problem_reported` | Employee reports a problem |
-| `problem_resolved` | Problem converted to task |
-
----
-
-## Auto-Update
-
-`UpdateService` checks GitHub Releases API on startup:
-
-- Compares installed version with latest release tag
-- Shows `UpdateModal` with changelog and 3 options: Install Now / Later / Never
-- Downloads APK via `dio`, opens via `open_file` (triggers Android installer)
-- Android-only (disabled on web/desktop via `kIsWeb` guard)
-
----
-
-## Multi-Platform
-
-| Platform | Features | Build |
-|---|---|---|
-| **Android** | Full (camera, auto-update, APK install, push notifications) | `flutter build apk --release` |
-| **Web** | Gallery picker (no camera), deployed to GitHub Pages | `flutter build web --release` |
-| **Windows** | Gallery picker, Inno Setup installer, "Open Web Version" button | `flutter build windows --release` |
-
----
-
-## Build & Release
-
-### Local Build
-
-```powershell
-cd C:\Users\Dali\Documents\Projects\task_tracker
-flutter pub get
-
-# Android APK
-flutter build apk --release
-# → build\app\outputs\flutter-apk\app-release.apk
-
-# Web
-flutter build web --release
-# → build\web\
-
-# Windows
-flutter build windows --release
-# → build\windows\x64\runner\Release\
-```
-
-### CI/CD (GitHub Actions)
-
-Push to `master` triggers `.github/workflows/build.yml` with **4 parallel jobs**:
-
-| Job | Output |
-|---|---|
-| `build-apk` | `Task-Tracker-v{ver}.apk` |
-| `build-web` | `Task-Tracker-v{ver}-web.zip` (includes `web_admin/`) |
-| `deploy-web` | Deploys to GitHub Pages |
-| `create-release` | Creates GitHub Release with all artifacts |
-
-### Required GitHub Secrets
+### Required Secrets
 
 | Secret | Purpose |
-|---|---|
-| `SERVICE_ACCOUNT_JSON_BASE64` | Base64-encoded Firebase service account JSON (for FCM) |
-| `ANDROID_KEYBASE64` | Base64-encoded release keystore (`release-key.jks`) |
-| `ANDROID_KEY_PASSWORD` | Keystore password (`tasktracker123`) |
-| `ANDROID_KEY_ALIAS` | Key alias (`task-tracker`) |
-
-### Release Artifacts
-
-| File | Platform | Usage |
-|---|---|---|
-| `Task-Tracker-v{ver}.apk` | Android | Sideload on phone |
-| `Task-Tracker-v{ver}-web.zip` | Web | Unzip, open `index.html` |
-| `Task-Tracker-v{ver}-Setup.exe` | Windows | Run installer |
+|--------|---------|
+| `SERVICE_ACCOUNT_JSON_BASE64` | Firebase service account (FCM push) |
+| `ANDROID_KEYBASE64` | Release keystore (APK signing) |
+| `ANDROID_KEY_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Key alias |
 
 ---
 
-## Android Config
+## 📦 Dependencies
 
-| Field | Value |
-|---|---|
-| `applicationId` | `com.example.task_tracker` |
-| `minSdk` | Flutter default |
-| `compileSdk` | Flutter default |
-| Java/Kotlin | VERSION_17 |
-| Desugaring | Enabled (for `flutter_local_notifications`) |
-| Signing | Release keystore via `android/key.properties` |
-
----
-
-## Dependencies
-
-| Package | Purpose |
-|---|---|
-| `firebase_core` | Firebase initialization |
-| `firebase_auth` | Authentication |
-| `cloud_firestore` | Database |
-| `firebase_messaging` | FCM token + foreground messages |
-| `flutter_local_notifications` | Local notification display |
-| `googleapis_auth` | Service account auth for FCM v1 |
-| `provider` | State management |
-| `image_picker` | Camera/gallery image capture |
-| `dio` | HTTP client for auto-update download |
-| `open_file` | Open downloaded APK |
-| `package_info_plus` | Read installed version |
-| `shared_preferences` | Local persistence |
-| `permission_handler` | Runtime permissions |
-| `url_launcher` | Open web version link |
-| `intl` | Date formatting |
-| `http` | HTTP requests (FCM sender) |
-| `path_provider` | File system paths |
+| Category | Packages |
+|----------|----------|
+| **Firebase** | `firebase_core` · `firebase_auth` · `cloud_firestore` · `firebase_messaging` |
+| **Notifications** | `flutter_local_notifications` · `googleapis_auth` |
+| **UI** | `provider` · `image_picker` · `intl` · `url_launcher` |
+| **Networking** | `http` · `dio` |
+| **Storage** | `shared_preferences` · `path_provider` |
+| **Platform** | `package_info_plus` · `permission_handler` · `open_file` |
 
 ---
 
-## I18n
+## 🌍 Internationalization
 
-Translations are in `lib/services/settings_service.dart`. Three languages:
+Three languages built-in with full RTL support:
 
-| Key | EN | FR | AR |
-|---|---|---|---|
-| `sign_in` | Sign In | Connexion | تسجيل الدخول |
-| `my_tasks` | My Tasks | Mes Tâches | مهامي |
-| `settings` | Settings | Paramètres | الإعدادات |
+| | English | French | Arabic |
+|---|---------|--------|--------|
+| Sign In | Sign In | Connexion | تسجيل الدخول |
+| My Tasks | My Tasks | Mes Tâches | مهامي |
+| Settings | Settings | Paramètres | الإعدادات |
+| Task Assigned | Task Assigned | Tâche assignée | تم تعيين مهمة |
 
-All UI strings go through `settings.t(key)` for translation. RTL is auto-detected for Arabic.
+All strings go through `settings.t(key)` — add a new language by adding a map to `settings_service.dart`.
 
 ---
 
-## Known Limitations
+## ⚠️ Known Limitations
 
-- **Delete Employee** removes Firestore doc but not the Firebase Auth user (requires Admin SDK)
-- **Firebase on Spark plan** — no Cloud Functions; push notifications work via app-side FCM
-- **applicationId** is `com.example.task_tracker` — changing requires re-registering in Firebase Console
-- **Existing presets** created before v0.2.1 lack `createdBy` and won't appear until manually updated in Firestore
-- **Windows installer** requires Inno Setup installed on the build machine
+| Issue | Details |
+|-------|---------|
+| Employee deletion | Removes Firestore doc only; Firebase Auth user requires Admin SDK |
+| Spark plan | No Cloud Functions; push works via app-side FCM |
+| Legacy presets | Created before v0.2.1 lack `createdBy` — won't appear until updated |
+| applicationId | `com.example.task_tracker` — changing requires Firebase Console re-registration |
+| Windows build | Requires Inno Setup installed on the build machine |
+
+---
+
+<div align="center">
+
+**Built with ❤️ using Flutter + Firebase**
+
+[Report Bug](https://github.com/DALI951/task-tracker/issues) · [Request Feature](https://github.com/DALI951/task-tracker/issues)
+
+</div>
