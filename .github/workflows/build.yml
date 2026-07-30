@@ -68,6 +68,46 @@ jobs:
           name: apk
           path: releases/Task-Tracker-v${{ steps.version.outputs.version }}.apk
 
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Decode service account
+        run: |
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON_BASE64 }}" | base64 -d > assets/service-account.json
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package unsigned ipa
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          mkdir -p releases
+          zip -r "releases/Task-Tracker-v${{ steps.version.outputs.version }}.ipa" Payload
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: releases/Task-Tracker-v${{ steps.version.outputs.version }}.ipa
+
   build-web:
     runs-on: ubuntu-latest
     steps:
@@ -129,8 +169,8 @@ jobs:
         uses: actions/deploy-pages@v4
 
   create-release:
-    needs: [build-apk, build-web]
-    if: always() && (needs.build-apk.result == 'success' || needs.build-web.result == 'success')
+    needs: [build-apk, build-ios, build-web]
+    if: always() && (needs.build-apk.result == 'success' || needs.build-ios.result == 'success' || needs.build-web.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -151,7 +191,7 @@ jobs:
       - name: List artifacts
         run: |
           mkdir -p release_files
-          find artifacts/ -type f \( -name '*.apk' -o -name '*.zip' -o -name '*.exe' \) -exec cp {} release_files/ \; 2>/dev/null || true
+          find artifacts/ -type f \( -name '*.apk' -o -name '*.zip' -o -name '*.exe' -o -name '*.ipa' \) -exec cp {} release_files/ \; 2>/dev/null || true
           ls -la release_files/ || echo "No release files found"
 
       - name: Upload release assets
@@ -180,3 +220,4 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
