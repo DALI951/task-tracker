@@ -5,7 +5,7 @@ Single unified Flutter app with role-based UI:
 - **Manager** — create/manage employees, assign tasks, review completions, view reported problems
 - **Employee** — view assigned tasks, start/complete with photo proof, report problems
 
-Account creation is done via `web_admin/index.html` (not in-app).
+Account creation is done by managers in-app (via Cloud Functions callables) and via `web_admin/index.html` (interim; still passphrase-gated — redesign pending).
 
 ---
 
@@ -16,11 +16,10 @@ Account creation is done via `web_admin/index.html` (not in-app).
 - `TaskProvider` handles tasks, employees, preset items, problems
 
 ### Firebase Auth
-- Client-side only (Spark plan). **No Cloud Functions deployed**.
-- `createUserWithEmailAndPassword` signs in as the **new** user. After creating an employee, the manager app re-authenticates the manager from stored credentials.
-- `SessionService` stores manager email/password in `shared_preferences`. On manager re-auth, the app reads email from `FirebaseAuth.instance.currentUser?.email` and prompts for password once per session (`_ensureManagerPass`).
-- `UserService.ensureManager()` creates `users/{uid}` with `role: 'manager'` on every sign-in (required for Firestore rules).
-- **No sign-up in app.** Accounts are created via `web_admin/index.html` or Firebase Console.
+- Cloud Functions code lives in `functions/index.js` and must be deployed (`firebase deploy --only functions`). Before that deploy, server-side callables/triggers are inactive.
+- Employee create / reset-password / delete go through Cloud Function callables (`createEmployee`, `setEmployeePassword`, `deleteEmployee`) using the Admin SDK — no client-side `createUserWithEmailAndPassword`, no session swapping, no stored passwords.
+- `UserService.ensureManager()` / `ensureEmployee()` are NOT called at runtime; roles come from the `users/{uid}` document.
+- **No sign-up in app.** Employee accounts are created by managers via the in-app Manage Employees screen. `web_admin/index.html` still exists but is passphrase-gated pending redesign.
 
 ### Auto-Update
 - `UpdateService` checks GitHub Releases API on app startup (after 2s delay)
@@ -40,12 +39,13 @@ Account creation is done via `web_admin/index.html` (not in-app).
 ### Firestore Collections
 | Collection | Read | Write | Notes |
 |---|---|---|---|
-| `users/{uid}` | owner | owner | Role storage (`manager` / `employee`) |
+| `users/{uid}` | owner, managers, or `role == 'manager'` docs | owner | Role storage (`manager` / `employee`) |
 | `tasks/{id}` | manager + assigned employee | manager | Employees can update status/photo |
-| `problems/{id}` | any auth'd user | any auth'd user create; manager update | Employees report, managers convert to tasks |
-| `employees/{email}` | manager only | manager only | Employee directory |
+| `problems/{id}` | reporter or owning manager (legacy `managerEmail == null` visible to all managers) | any auth'd user create (no `managerEmail`); manager update | `managerEmail` stamped by `onProblemCreated` trigger |
+| `employees/{email}` | manager only | manager only (callable) | Employee directory |
 | `preset_tasks/{id}` | any auth'd user | manager only | Task templates |
 | `preset_items/{id}` | any auth'd user | manager only | Item templates |
+| `notifications/{id}` | recipient | sender | FCM push sent by `onNotificationCreated` trigger |
 
 ### Key Files
 
@@ -63,10 +63,10 @@ Account creation is done via `web_admin/index.html` (not in-app).
 | `lib/services/update_service.dart` | GitHub API check, download, install |
 | `lib/providers/task_provider.dart` | All state management |
 | `lib/services/firestore_service.dart` | Firestore CRUD |
-| `lib/services/session_service.dart` | Manager credential storage |
+| `lib/services/callables.dart` | Cloud Functions callable wrappers |
 | `lib/services/settings_service.dart` | Theme/language prefs + i18n |
-| `lib/services/user_service.dart` | Role management |
-| `web_admin/index.html` | Account creation website |
+| `lib/services/user_service.dart` | Role management (getRole) |
+| `web_admin/index.html` | Account creation website (interim passphrase gate; redesign pending) |
 | `windows/installer/task-tracker-setup.iss` | Inno Setup installer script |
 
 ### App Icon
@@ -129,18 +129,15 @@ flutter build windows --release
 
 ## Account Creation
 
-Use `web_admin/index.html`:
-1. Open in browser
-2. Enter admin passphrase: `tasktracker2024`
-3. Fill: email, password, display name, role (manager/employee)
-4. Click "Create Account"
-
-Creates Firebase Auth user + Firestore `users/{uid}` doc with role.
-
----
+- **Employees**: managers use the in-app **Manage Employees** screen → `createEmployee` Cloud Function (Admin SDK).
+- **Managers**: pending redesign. Interim options: Firebase Console, or the passphrase-gated `web_admin/index.html` (tasktracker2024 — known weak, kept only until the redesign lands).
+- `moderator.html` self-signup was removed (any visitor could mint a manager account).
 
 ## Known Issues
-- **Delete Employee** removes Firestore doc but does NOT delete the Firebase Auth user (would need Admin SDK).
-- **Password reset** requires stored password to be current. Falls back to `sendPasswordResetEmail`.
+- **Delete Employee** now deletes the Auth user via the `deleteEmployee` callable (requires functions deployed).
+- **Password reset** uses the `setEmployeePassword` callable (no stored plaintext password anymore).
+- Legacy problems (created before `managerEmail` tagging) are invisible to managers in the problems list until a one-time backfill tags them; run `backfillProblemManagers` after deploying.
+- Legacy employees created by the old `web_admin` have `createdBy: 'web_admin'` and are treated as modifiable by any manager (ownership fallback).
 - **Manager APK** exceeds GitHub's recommended 50MB — works fine but shows a warning.
 - **APK install** requires "Install Unknown Apps" permission on Android (granted once by user).
+- **Push notifications** depend on the `onNotificationCreated` trigger (functions deployed).

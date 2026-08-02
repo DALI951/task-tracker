@@ -23,14 +23,15 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if isAuth() && request.auth.uid == uid;
       allow read: if isAuth() && isManager(request.auth.uid);
-      allow read: if isAuth();
+      allow read: if isAuth() && resource.data.role == 'manager';
     }
 
     // ─── Tasks ────────────────────────────────────────────────
 
     match /tasks/{taskId} {
       // Managers: create tasks they own
-      allow create: if isAuth() && isManager(request.auth.uid);
+      allow create: if isAuth() && isManager(request.auth.uid)
+        && request.resource.data.createdBy == userEmail();
 
       // Managers: read/update/delete their own tasks
       allow read, update, delete: if isAuth() && isManager(request.auth.uid)

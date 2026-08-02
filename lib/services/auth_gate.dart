@@ -132,22 +132,12 @@ class _AuthGateState extends State<AuthGate> {
             _loading = false;
           });
         } else if (mounted) {
-          // Auto-provision as employee if doc is missing
-          await _userService.ensureEmployee(uid, email);
-          final retryRole = await _userService.getRole(uid);
-          if (retryRole != null && retryRole.isNotEmpty && mounted) {
-            await prefs.setString('role_$uid', retryRole);
-            settings.currentRole = retryRole;
-            setState(() {
-              _resolvedRole = retryRole;
-              _loading = false;
-            });
-          } else {
-            setState(() {
-              _resolvedRole = '';
-              _loading = false;
-            });
-          }
+          // No role document — show "account not configured" instead of
+          // auto-provisioning an employee account for any signed-in user.
+          setState(() {
+            _resolvedRole = '';
+            _loading = false;
+          });
         }
       } catch (_) {
         if (!mounted) return;
