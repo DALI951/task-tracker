@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:task_tracker/config/brand.dart';
@@ -36,11 +37,24 @@ class SettingsService extends ChangeNotifier {
     _accentColor = Color(accentStr);
     final accountsJson = prefs.getString(_accountsKey);
     if (accountsJson != null) {
-      _rememberedAccounts = (accountsJson.split('|').where((s) => s.isNotEmpty).map((s) {
-        final parts = s.split(',');
-        if (parts.length >= 2) return {'email': parts[0], 'name': parts[1]};
-        return {'email': parts[0], 'name': parts[0]};
-      })).toList();
+      try {
+        final decoded = jsonDecode(accountsJson);
+        if (decoded is List) {
+          _rememberedAccounts = decoded.map((e) {
+            final m = e as Map;
+            return {
+              'email': m['email'].toString(),
+              'name': m['name'].toString(),
+            };
+          }).toList();
+        }
+      } catch (_) {
+        _rememberedAccounts = (accountsJson.split('|').where((s) => s.isNotEmpty).map((s) {
+          final parts = s.split(',');
+          if (parts.length >= 2) return {'email': parts[0], 'name': parts[1]};
+          return {'email': parts[0], 'name': parts[0]};
+        })).toList();
+      }
     }
     _notificationsEnabled = prefs.getBool(_notifEnabledKey) ?? true;
     notifyListeners();
@@ -89,7 +103,7 @@ class SettingsService extends ChangeNotifier {
 
   Future<void> _saveAccounts() async {
     final prefs = await SharedPreferences.getInstance();
-    final json = _rememberedAccounts.map((a) => '${a['email']},${a['name']}').join('|');
+    final json = jsonEncode(_rememberedAccounts);
     await prefs.setString(_accountsKey, json);
   }
 
