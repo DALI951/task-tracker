@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:task_tracker/models/task.dart';
+import 'package:task_tracker/screens/problems_screen.dart';
+import 'package:task_tracker/screens/task_detail_screen.dart';
 import 'package:task_tracker/services/settings_service.dart';
 
 final FlutterLocalNotificationsPlugin _localNotifications =
@@ -145,7 +148,35 @@ class PushNotificationService {
   }
 
   void _handleNotificationTap(Map<String, dynamic> data) {
-    // Could navigate to specific task/problem based on data
+    final type = data['type'] as String?;
+    final relatedId = data['relatedId'] as String?;
+    if (_navigator == null || type == null) return;
+
+    final isManager = _settings?.currentRole == 'manager';
+
+    if (type.startsWith('task') && relatedId != null) {
+      _openTask(relatedId, isManager);
+    } else if (type.startsWith('problem') && isManager) {
+      _navigator?.push(
+        MaterialPageRoute(builder: (_) => const ProblemsScreen()),
+      );
+    }
+  }
+
+  Future<void> _openTask(String taskId, bool isManager) async {
+    try {
+      final snap = await _db.collection('tasks').doc(taskId).get();
+      if (!snap.exists) return;
+      final task = AppTask.fromMap(snap.data() as Map<String, dynamic>, taskId);
+      if (_navigator == null) return;
+      _navigator!.push(
+        MaterialPageRoute(
+          builder: (_) => TaskDetailScreen(task: task, isManager: isManager),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Failed to open task from notification: $e');
+    }
   }
 
   Future<void> _showLocalNotification({
