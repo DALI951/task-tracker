@@ -5,7 +5,11 @@ Single unified Flutter app with role-based UI:
 - **Manager** — create/manage employees, assign tasks, review completions, view reported problems
 - **Employee** — view assigned tasks, start/complete with photo proof, report problems
 
-Account creation: employees are created by managers in-app via Cloud Function callables; managers are created via one-time invite links from `web_admin/index.html`.
+## Backend status (2026-08-02)
+
+- The project is on Firebase's free **Spark** plan. **Cloud Functions and Cloud Storage cannot be deployed** (both require the paid Blaze plan; storage enforcement began Feb 2026). Firestore rules ARE deployed (user ran `firebase deploy --only firestore`).
+- **Interim (v0.4.1):** employee management is client-side (below). Photos are inline base64. FCM device push is OFF until a backend exists; the in-app notification list still works.
+- **Planned PHP backend (parked):** when the user provides server access (domain + FTP + owner email), build a PHP backend (`server/`) on their own server (powerpme.com, Apache + PHP 8.5.6 + curl) to replace the Cloud Functions and Firebase Storage: employee Auth management, one-time manager invites, FCM push, and photo uploads. App gets an HTTP API client pointed at the domain; released as v0.5.0. **No MySQL needed** — invites can live in Firestore. This is how the app is expected to evolve; nothing PHP has been built yet.
 
 ---
 
@@ -15,12 +19,15 @@ Account creation: employees are created by managers in-app via Cloud Function ca
 - `ChangeNotifier` + `Provider`
 - `TaskProvider` handles tasks, employees, preset items, problems
 
-### Firebase Auth
-- Cloud Functions code lives in `functions/index.js` and must be deployed (`firebase deploy --only functions`). Before that deploy, server-side callables/triggers are inactive.
-- Employee create / reset-password / delete go through Cloud Function callables (`createEmployee`, `setEmployeePassword`, `deleteEmployee`) using the Admin SDK — no client-side `createUserWithEmailAndPassword`, no session swapping, no stored passwords.
-- Manager accounts are created through one-time invite links: `createInvite` (owner-only, allowlist via `firebase functions:config:set manager.allowlist="owner@example.com"`) mints `invites/{code}` docs; `redeemInvite` (unauthenticated — the code is the credential) burns the code while creating the Auth account + `users/{uid}` role manager. The invite code is the gate: links are single-use and can't be replayed.
+### Firebase Auth / employee accounts (INTERIM — client-side)
+- `cloud_functions` and `firebase_storage` dependencies are removed; `lib/services/callables.dart` is deleted.
+- **Create employee** (`manage_employees_screen.dart` → `_createEmployeeAccount`): client-side `createUserWithEmailAndPassword`. The auth session briefly switches to the new account (Firebase limitation), so the manager's password is cached in memory via `lib/services/manager_session.dart` (`ManagerSession`, prompt once per app session, never persisted) and used to sign back in. Sequence: capture manager email → create account (get `authUid`) → new account writes its own `users/{uid}` role doc (rules allow self-write) → re-auth as manager → manager writes `employees/{email}` (incl. `authUid`).
+- **Email-already-exists:** interim dialog offers only "Send password reset email" (client SDK can't replace/link/read an existing account's uid). Full Replace / Use Existing / Change Password returns with the PHP backend.
+- **Reset password:** `sendPasswordResetEmail(email)` — the employee sets their own password via email link.
+- **Delete employee:** deletes the `employees/{email}` directory doc. `lib/services/auth_gate.dart` blocks employees whose directory doc is missing (fail-open on read errors so a rules-rollout gap never locks out real employees). The Firebase Auth account itself is NOT deleted until the PHP backend exists.
+- Manager accounts: `web_admin/index.html` invite page calls undeployed Cloud Functions and is **currently non-functional (dormant)**; it will be replaced by the PHP admin site.
 - `UserService.ensureManager()` / `ensureEmployee()` are NOT called at runtime; roles come from the `users/{uid}` document.
-- **No sign-up in app.** Employees are created by managers in-app; managers only via invite links from `web_admin/index.html`.
+- **No sign-up in app.**
 
 ### Auto-Update
 - `UpdateService` checks GitHub Releases API on app startup (after 2s delay)
@@ -42,13 +49,13 @@ Account creation: employees are created by managers in-app via Cloud Function ca
 ### Firestore Collections
 | Collection | Read | Write | Notes |
 |---|---|---|---|
-| `users/{uid}` | owner, managers, or `role == 'manager'` docs | owner | Role storage (`manager` / `employee`) |
+| `users/{uid}` | owner, managers, or `role == 'manager'` docs | owner | Role storage (`manager` / `employee`); employee self-writes on creation |
 | `tasks/{id}` | manager + assigned employee | manager | Employees can update status/photo |
-| `problems/{id}` | reporter or owning manager (legacy `managerEmail == null` visible to all managers) | any auth'd user create (no `managerEmail`); manager update | `managerEmail` stamped by `onProblemCreated` trigger |
-| `employees/{email}` | manager only | manager only (callable) | Employee directory |
+| `problems/{id}` | reporter or owning manager (legacy `managerEmail == null` visible to all managers) | any auth'd user create (no `managerEmail`); manager update | `managerEmail` tagging was server-side (undeployed) — pending PHP/cron |
+| `employees/{email}` | manager only (createdBy) or **the employee themselves** (interim delete check) | manager only | Employee directory; carries `authUid` |
 | `preset_tasks/{id}` | any auth'd user | manager only | Task templates |
 | `preset_items/{id}` | any auth'd user | manager only | Item templates |
-| `notifications/{id}` | recipient | sender | FCM push sent by `onNotificationCreated` trigger |
+| `notifications/{id}` | recipient | sender | Written by client with `sent:false`; FCM send pending backend |
 
 ### Key Files
 
@@ -59,17 +66,21 @@ Account creation: employees are created by managers in-app via Cloud Function ca
 | `lib/screens/manager_dashboard.dart` | Manager UI: tasks + problems tabs, create task |
 | `lib/screens/employee_tasks_screen.dart` | Employee UI: task list, start/complete |
 | `lib/screens/task_detail_screen.dart` | Task detail (shared, `isManager` flag) |
-| `lib/screens/manage_employees_screen.dart` | CRUD employees |
+| `lib/screens/manage_employees_screen.dart` | CRUD employees (interim client-side flow) |
 | `lib/screens/problems_screen.dart` | View/convert problems |
-| `lib/screens/settings_screen.dart` | Theme, language, check for updates |
+| `lib/screens/settings_screen.dart` | Theme, language, check for updates, What's New |
 | `lib/screens/update_modal.dart` | Update prompt modal |
 | `lib/services/update_service.dart` | GitHub API check, download, install |
+| `lib/services/update_download_manager.dart` | Background APK download (ChangeNotifier) |
+| `lib/services/manager_session.dart` | In-memory manager credentials (interim create flow) |
 | `lib/providers/task_provider.dart` | All state management |
 | `lib/services/firestore_service.dart` | Firestore CRUD |
-| `lib/services/callables.dart` | Cloud Functions callable wrappers |
+| `lib/services/auth_gate.dart` | Role resolution + interim deleted-employee block |
 | `lib/services/settings_service.dart` | Theme/language prefs + i18n |
 | `lib/services/user_service.dart` | Role management (getRole) |
-| `web_admin/index.html` | Invite-only manager signup website + owner console (generate/list invites, backfill) |
+| `lib/services/storage_service.dart` | Photo upload (interim base64) |
+| `functions/index.js` | Reference Cloud Functions implementation — NOT deployed, NOT used by the client |
+| `web_admin/index.html` | Invite page — dormant until the PHP admin site replaces it |
 | `windows/installer/task-tracker-setup.iss` | Inno Setup installer script |
 
 ### App Icon
@@ -132,15 +143,17 @@ flutter build windows --release
 
 ## Account Creation
 
-- **Employees**: managers use the in-app **Manage Employees** screen → `createEmployee` Cloud Function (Admin SDK).
-- **Managers**: `web_admin/index.html` → owner signs in, generates a one-time invite link, sends it privately to the approved person, who creates their own account. Requires `firebase functions:config:set manager.allowlist="owner@example.com"` at deploy (unset = no one can mint invites).
+- **Employees (interim):** managers use the in-app **Manage Employees** screen. Client-side create with a brief session swap (manager password asked once per session, held in memory via `ManagerSession`); reset via password-reset email; delete removes the directory doc and the auth gate blocks that account.
+- **Managers (parked):** one-time invite links from a PHP admin site on the user's server (domain + FTP pending). Until then, managers can only be created in the Firebase Console.
 - `moderator.html` self-signup was removed (any visitor could mint a manager account).
 
 ## Known Issues
-- **Delete Employee** now deletes the Auth user via the `deleteEmployee` callable (requires functions deployed).
-- **Password reset** uses the `setEmployeePassword` callable (no stored plaintext password anymore).
-- Legacy problems (created before `managerEmail` tagging) are invisible to managers in the problems list until a one-time backfill tags them; run `backfillProblemManagers` after deploying.
+- **FCM device push is OFF** until the PHP backend ships (no functions/Storage on Spark). In-app notifications list still works.
+- **Photos are base64** (interim) — watch the 1 MiB document limit. Legacy remote URLs still render.
+- **Delete does not remove the Firebase Auth account** (client SDK can't) — the account is blocked via the directory check instead. Full removal with the PHP backend.
+- **Email-already-exists** on create only offers a reset email (full conflict tools pending backend).
+- Legacy problems (created before `managerEmail` tagging) are visible to all managers until a backfill runs (pending backend/cron).
 - Legacy employees created by the old `web_admin` have `createdBy: 'web_admin'` and are treated as modifiable by any manager (ownership fallback).
 - **Manager APK** exceeds GitHub's recommended 50MB — works fine but shows a warning.
 - **APK install** requires "Install Unknown Apps" permission on Android (granted once by user).
-- **Push notifications** depend on the `onNotificationCreated` trigger (functions deployed).
+- After the next `firestore.rules` change, re-run `firebase deploy --only firestore` (currently the rules include the employees self-read rule).
