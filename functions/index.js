@@ -1,9 +1,27 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const crypto = require('crypto');
 
 admin.initializeApp();
 
 const db = admin.firestore();
+
+const INVITE_BASE_URL =
+  'https://dali951.github.io/task-tracker/admin/index.html';
+
+// Only these emails may mint manager invites. Configure at deploy time with:
+//   firebase functions:config:set manager.allowlist="owner@example.com"
+// Empty/unset => no one can mint invites (fail closed).
+function isInviteOwner(email) {
+  if (!email) return false;
+  const raw =
+    (functions.config().manager && functions.config().manager.allowlist) || '';
+  const allowed = raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return allowed.includes(email.toLowerCase());
+}
 
 async function isManager(uid) {
   const doc = await db.doc(`users/${uid}`).get();
@@ -298,4 +316,135 @@ exports.backfillProblemManagers = functions.https.onCall(async (_data, context) 
     functions.logger.warn('backfillProblemManagers failed', e);
     throw new functions.https.HttpsError('internal', e.message);
   }
+});
+
+// Mints a one-time manager invite. Only the owner (email on the allowlist)
+// may call this. Returns a private URL to send to the approved person.
+exports.createInvite = functions.https.onCall(async (_data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be signed in');
+  }
+  const ownerEmail = (await admin.auth().getUser(context.auth.uid)).email || '';
+  if (!isInviteOwner(ownerEmail)) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Only the account owner can generate invites'
+    );
+  }
+
+  const code = crypto.randomBytes(9).toString('base64url');
+  await db.doc(`invites/${code}`).set({
+    role: 'manager',
+    createdBy: ownerEmail,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    used: false,
+  });
+
+  return { code, url: `${INVITE_BASE_URL}?invite=${code}` };
+});
+
+// Redeems a one-time manager invite: creates the Auth account (role manager)
+// and burns the code. The invite code itself is the credential, so this is
+// deliberately callable without an authenticated session.
+exports.redeemInvite = functions.https.onCall(async (data, context) => {
+  const code = data && data.code;
+  const email = data && data.email ? String(data.email).trim() : '';
+  const name = data && data.name ? String(data.name).trim() : '';
+  const password = data && data.password ? String(data.password) : '';
+
+  if (!code || !email || !name || !password) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'code, email, name and password are required'
+    );
+  }
+  if (password.length < 6) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Password must be at least 6 characters'
+    );
+  }
+
+  const inviteRef = db.doc(`invites/${code}`);
+  await db.runTransaction(async (txn) => {
+    const snap = await txn.get(inviteRef);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError(
+        'not-found',
+        'Invalid invite code. Ask the owner for a fresh link.'
+      );
+    }
+    const invite = snap.data();
+    if (invite.used) {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'This invite link has already been used. Ask the owner for a new link.'
+      );
+    }
+    txn.update(inviteRef, {
+      used: true,
+      usedBy: email,
+      usedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  let uid;
+  try {
+    const user = await admin.auth().createUser({
+      email,
+      password,
+      displayName: name,
+    });
+    uid = user.uid;
+  } catch (e) {
+    if (e.code === 'auth/email-already-exists') {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'An account with this email already exists'
+      );
+    }
+    throw new functions.https.HttpsError('internal', e.message);
+  }
+
+  await db.doc(`users/${uid}`).set({
+    email,
+    role: 'manager',
+    displayName: name,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true };
+});
+
+// Lists recent invites so the owner can see status + resend/regenerate.
+exports.listInvites = functions.https.onCall(async (_data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be signed in');
+  }
+  const ownerEmail = (await admin.auth().getUser(context.auth.uid)).email || '';
+  if (!isInviteOwner(ownerEmail)) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Only the account owner can list invites'
+    );
+  }
+
+  const snaps = await db
+    .collection('invites')
+    .orderBy('createdAt', 'desc')
+    .limit(50)
+    .get();
+
+  const invites = snaps.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      code: doc.id,
+      used: !!data.used,
+      usedBy: data.usedBy || null,
+      createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : null,
+      url: `${INVITE_BASE_URL}?invite=${doc.id}`,
+    };
+  });
+
+  return { invites };
 });

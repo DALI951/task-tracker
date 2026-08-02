@@ -109,5 +109,13 @@ service cloud.firestore {
       allow delete: if isAuth() &&
         resource.data.recipientEmail == userEmail();
     }
+
+    // ─── Invites (manager signup links) ───────────────────────
+    // Written/read only by Cloud Functions (Admin SDK) and managers;
+    // the invite code itself is the credential for redemption.
+
+    match /invites/{code} {
+      allow read, write: if isAuth() && isManager(request.auth.uid);
+    }
   }
 }
