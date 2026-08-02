@@ -114,6 +114,48 @@ exports.createEmployee = functions.https.onCall(async (data, context) => {
   }
 });
 
+exports.deleteEmployee = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated', 'Must be signed in'
+    );
+  }
+
+  if (!(await isManager(context.auth.uid))) {
+    throw new functions.https.HttpsError(
+      'permission-denied', 'Only managers can delete employees'
+    );
+  }
+
+  const { email } = data;
+  if (!email) {
+    throw new functions.https.HttpsError(
+      'invalid-argument', 'Email required'
+    );
+  }
+
+  try {
+    const managerEmail = (await admin.auth().getUser(context.auth.uid)).email || '';
+    await assertCanManageEmployee(managerEmail, email);
+
+    const user = await admin.auth().getUserByEmail(email);
+    await admin.auth().deleteUser(user.uid);
+    await db.doc(`users/${user.uid}`).delete().catch(() => {});
+    await db.doc(`employees/${email}`).delete();
+
+    return { success: true };
+  } catch (e) {
+    if (e.code === 'auth/user-not-found') {
+      await db.doc(`employees/${email}`).delete().catch(() => {});
+      return { success: true };
+    }
+    if (e instanceof functions.https.HttpsError) {
+      throw e;
+    }
+    throw new functions.https.HttpsError('internal', e.message);
+  }
+});
+
 exports.setEmployeePassword = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
