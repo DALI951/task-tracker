@@ -9,7 +9,6 @@ import 'package:task_tracker/firebase_options.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_gate.dart';
 import 'package:task_tracker/services/push_notification_service.dart';
-import 'package:task_tracker/services/session_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
 
@@ -26,13 +25,11 @@ void main() {
 Future<void> _initApp() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (!kIsWeb) {
-    await SessionService().init();
     runApp(TaskTrackerApp());
     // Init push notifications after app is running (non-blocking)
     PushNotificationService().initialize();
     try { Permission.requestInstallPackages.request(); } catch (_) {}
   } else {
-    await SessionService().init();
     runApp(TaskTrackerApp());
   }
 }

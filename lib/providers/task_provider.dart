@@ -556,17 +556,6 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> addEmployee(String email, String name, String createdBy, {String? password}) async {
-    try {
-      await _firestore.addEmployee(email, name, createdBy, password: password);
-      return true;
-    } catch (e) {
-      _error = friendlyError(e);
-      notifyListeners();
-      return false;
-    }
-  }
-
   Future<bool> updateEmployeeName(String email, String newName) async {
     try {
       await _firestore.updateEmployee(email, {'name': newName});
@@ -577,32 +566,6 @@ class TaskProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-  }
-
-  Future<bool> updateEmployeeField(String email, Map<String, dynamic> data) async {
-    try {
-      await _firestore.updateEmployee(email, data);
-      return true;
-    } catch (e) {
-      _error = friendlyError(e);
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> deleteEmployee(String email) async {
-    try {
-      await _firestore.deleteEmployee(email);
-      return true;
-    } catch (e) {
-      _error = friendlyError(e);
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<Map<String, dynamic>?> getEmployee(String email) async {
-    return await _firestore.getEmployee(email);
   }
 
   Future<bool> addPresetItem(String name, String createdBy) async {

@@ -73,16 +73,6 @@ class FirestoreService {
         .snapshots();
   }
 
-  Future<void> addEmployee(String email, String name, String createdBy, {String? password}) async {
-    await _employeesRef.doc(email).set({
-      'email': email,
-      'name': name,
-      'createdBy': createdBy,
-      'createdAt': FieldValue.serverTimestamp(),
-      if (password != null) 'storedPassword': password,
-    });
-  }
-
   Future<void> updateEmployee(String email, Map<String, dynamic> data) async {
     await _employeesRef.doc(email).update(data);
   }
@@ -96,20 +86,10 @@ class FirestoreService {
     await batch.commit();
   }
 
-  Future<void> deleteEmployee(String email) async {
-    await _employeesRef.doc(email).delete();
-  }
-
   Stream<QuerySnapshot> employeesStream(String createdBy) {
     return _employeesRef
         .where('createdBy', isEqualTo: createdBy)
         .snapshots();
-  }
-
-  Future<Map<String, dynamic>?> getEmployee(String email) async {
-    final doc = await _employeesRef.doc(email).get();
-    if (!doc.exists) return null;
-    return doc.data() as Map<String, dynamic>?;
   }
 
   Future<void> addPresetItem(String name, String createdBy) async {

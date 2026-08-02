@@ -1,11 +1,9 @@
-import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/providers/task_provider.dart';
-import 'package:task_tracker/services/session_service.dart';
+import 'package:task_tracker/services/callables.dart';
 import 'package:task_tracker/services/settings_service.dart';
-import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
 class ManageEmployeesScreen extends StatefulWidget {
@@ -19,7 +17,6 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   final _emailCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  String? _managerPass;
 
   @override
   void dispose() {
@@ -27,72 +24,6 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     _nameCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
-  }
-
-  String? get _managerEmail => FirebaseAuth.instance.currentUser?.email;
-
-  Future<String?> _ensureManagerPass() async {
-    if (_managerPass != null) return _managerPass;
-    final saved = SessionService().managerPassword;
-    if (saved != null) {
-      _managerPass = saved;
-      return saved;
-    }
-    // One-time prompt per session
-    final passCtrl = TextEditingController();
-    final completer = Completer<String?>();
-    bool showPass = false;
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDState) => AlertDialog(
-          title: const Text('Enter Your Password'),
-          content: TextField(
-            controller: passCtrl,
-            decoration: InputDecoration(
-              labelText: 'Password',
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                icon: Icon(showPass ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setDState(() => showPass = !showPass),
-              ),
-            ),
-            obscureText: !showPass,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                passCtrl.dispose();
-                Navigator.pop(ctx);
-                completer.complete(null);
-              },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final p = passCtrl.text;
-                if (p.isEmpty) return;
-                // Verify password by trying to re-auth
-                try {
-                  await FirebaseAuth.instance.signInWithEmailAndPassword(
-                    email: _managerEmail ?? '',
-                    password: p,
-                  );
-                  _managerPass = p;
-                  passCtrl.dispose();
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  completer.complete(p);
-                } catch (e) {
-                  if (mounted) toast(context, 'Wrong password', error: true);
-                }
-              },
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
-      ),
-    );
-    return completer.future;
   }
 
   void _addEmployee() {
@@ -155,60 +86,44 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                               _nameCtrl.text.isEmpty ||
                               _passCtrl.text.length < 6) return;
 
-                          final managerEmail = _managerEmail;
-                          if (managerEmail == null) {
-                            if (mounted) toast(context, 'Not signed in', error: true);
-                            return;
-                          }
-
-                          final managerPass = await _ensureManagerPass();
-                          if (managerPass == null) {
-                            if (mounted) toast(context, 'Password required', error: true);
-                            return;
-                          }
-
                           setDState(() => creating = true);
 
                           final email = _emailCtrl.text.trim();
                           final name = _nameCtrl.text.trim();
                           final password = _passCtrl.text;
-                          final auth = FirebaseAuth.instance;
 
                           try {
-                            final result = await auth.createUserWithEmailAndPassword(
+                            await Callables.createEmployee(
                               email: email,
+                              name: name,
                               password: password,
                             );
-
-                            await UserService().setRole(result.user!.uid, 'employee');
-
-                            await auth.signInWithEmailAndPassword(
-                              email: managerEmail,
-                              password: managerPass,
-                            );
-
-                            await context.read<TaskProvider>().addEmployee(
-                                  email,
-                                  name,
-                                  managerEmail,
-                                  password: password,
-                                );
-
                             if (ctx.mounted) Navigator.pop(ctx);
                             if (mounted) toast(context, 'Employee created');
-                          } on FirebaseAuthException catch (e) {
-                            if (e.code == 'email-already-in-use') {
+                          } on FirebaseFunctionsException catch (e) {
+                            if (e.code == 'already-exists') {
                               if (ctx.mounted) Navigator.pop(ctx);
                               if (mounted) {
                                 _resolveExistingAccount(email, name, password);
                               }
+                            } else if (e.code == 'permission-denied') {
+                              setDState(() => creating = false);
+                              if (mounted) {
+                                toast(context,
+                                    'This employee was created by another manager',
+                                    error: true);
+                              }
                             } else {
                               setDState(() => creating = false);
-                              if (mounted) toast(context, friendlyError(e), error: true);
+                              if (mounted) {
+                                toast(context, friendlyError(e), error: true);
+                              }
                             }
                           } catch (e) {
                             setDState(() => creating = false);
-                            if (mounted) toast(context, friendlyError(e), error: true);
+                            if (mounted) {
+                              toast(context, friendlyError(e), error: true);
+                            }
                           }
                         },
                   child: creating
@@ -229,19 +144,42 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
 
   Future<void> _resolveExistingAccount(
       String email, String name, String password) async {
-    final passCtrl = TextEditingController(text: password);
-    final managerEmail = _managerEmail;
-    final managerPass = await _ensureManagerPass();
-
     await showDialog(
       context: context,
       builder: (ctx) {
-        bool showPass = false;
         bool loading = false;
         String? errorText;
 
         return StatefulBuilder(
           builder: (ctx, setDState) {
+            Future<void> run(
+                Future<void> Function() op, String actionName) async {
+              setDState(() { loading = true; errorText = null; });
+              try {
+                await op();
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  toast(
+                    context,
+                    actionName == 'replace'
+                        ? 'Employee replaced & created'
+                        : actionName == 'link'
+                            ? 'Employee linked successfully'
+                            : 'Password changed',
+                  );
+                }
+              } on FirebaseFunctionsException catch (e) {
+                setDState(() {
+                  loading = false;
+                  errorText = e.code == 'permission-denied'
+                      ? 'This employee was created by another manager'
+                      : friendlyError(e);
+                });
+              } catch (e) {
+                setDState(() { loading = false; errorText = friendlyError(e); });
+              }
+            }
+
             return AlertDialog(
               title: const Text('Email Already Registered'),
               content: Column(
@@ -250,21 +188,15 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                 children: [
                   Text('"$email" is already in use.'),
                   const SizedBox(height: 12),
-                  const Text('Enter the existing password then choose:'),
+                  const Text('Choose how to handle this account:'),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: passCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Existing Password',
-                      border: const OutlineInputBorder(),
-                      errorText: errorText,
-                      suffixIcon: IconButton(
-                        icon: Icon(showPass ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setDState(() => showPass = !showPass),
-                      ),
+                  if (errorText != null) ...[
+                    Text(
+                      errorText!,
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
                     ),
-                    obscureText: !showPass,
-                  ),
+                    const SizedBox(height: 8),
+                  ],
                   if (loading) ...[
                     const SizedBox(height: 12),
                     const Center(child: CircularProgressIndicator()),
@@ -279,101 +211,42 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                 TextButton(
                   onPressed: loading
                       ? null
-                      : () async {
-                          if (passCtrl.text.isEmpty) return;
-                          setDState(() { loading = true; errorText = null; });
-
-                          try {
-                            final auth = FirebaseAuth.instance;
-                            await auth.signInWithEmailAndPassword(
+                      : () => run(
+                            Callables.setEmployeePassword(
                               email: email,
-                              password: passCtrl.text,
-                            );
-                            await auth.currentUser!.delete();
-
-                            final newUser = await auth.createUserWithEmailAndPassword(
-                              email: email,
-                              password: password,
-                            );
-                            await UserService().setRole(newUser.user!.uid, 'employee');
-
-                            if (managerEmail != null && managerPass != null) {
-                              await auth.signInWithEmailAndPassword(
-                                email: managerEmail,
-                                password: managerPass,
-                              );
-                            }
-
-                            await context.read<TaskProvider>().addEmployee(
-                                  email,
-                                  name,
-                                  managerEmail ?? '',
-                                  password: password,
-                                );
-
-                            if (ctx.mounted) Navigator.pop(ctx);
-                            if (mounted) toast(context, 'Employee replaced & created');
-                          } on FirebaseAuthException catch (e) {
-                            if (e.code == 'wrong-password' ||
-                                e.code == 'invalid-credential') {
-                              setDState(() { loading = false; errorText = 'Wrong password'; });
-                            } else {
-                              setDState(() => loading = false);
-                              if (mounted) toast(context, friendlyError(e), error: true);
-                            }
-                          } catch (e) {
-                            setDState(() => loading = false);
-                            if (mounted) toast(context, friendlyError(e), error: true);
-                          }
-                        },
-                  child: const Text('Replace'),
+                              newPassword: password,
+                            ),
+                            'password',
+                          ),
+                  child: const Text('Change Password'),
                 ),
                 TextButton(
                   onPressed: loading
                       ? null
-                      : () async {
-                          if (passCtrl.text.isEmpty) return;
-                          setDState(() { loading = true; errorText = null; });
-
-                          try {
-                            final auth = FirebaseAuth.instance;
-                            await auth.signInWithEmailAndPassword(
+                      : () => run(
+                            Callables.createEmployee(
                               email: email,
-                              password: passCtrl.text,
-                            );
-
-                            await UserService().setRole(auth.currentUser!.uid, 'employee');
-
-                            if (managerEmail != null && managerPass != null) {
-                              await auth.signInWithEmailAndPassword(
-                                email: managerEmail,
-                                password: managerPass,
-                              );
-                            }
-
-                            await context.read<TaskProvider>().addEmployee(
-                                  email,
-                                  name,
-                                  managerEmail ?? '',
-                                  password: passCtrl.text,
-                                );
-
-                            if (ctx.mounted) Navigator.pop(ctx);
-                            if (mounted) toast(context, 'Employee linked successfully');
-                          } on FirebaseAuthException catch (e) {
-                            if (e.code == 'wrong-password' ||
-                                e.code == 'invalid-credential') {
-                              setDState(() { loading = false; errorText = 'Wrong password'; });
-                            } else {
-                              setDState(() => loading = false);
-                              if (mounted) toast(context, friendlyError(e), error: true);
-                            }
-                          } catch (e) {
-                            setDState(() => loading = false);
-                            if (mounted) toast(context, friendlyError(e), error: true);
-                          }
-                        },
+                              name: name,
+                              password: password,
+                              mode: 'link',
+                            ),
+                            'link',
+                          ),
                   child: const Text('Use Existing'),
+                ),
+                TextButton(
+                  onPressed: loading
+                      ? null
+                      : () => run(
+                            Callables.createEmployee(
+                              email: email,
+                              name: name,
+                              password: password,
+                              mode: 'replace',
+                            ),
+                            'replace',
+                          ),
+                  child: const Text('Replace'),
                 ),
               ],
             );
@@ -381,8 +254,6 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
         );
       },
     );
-
-    passCtrl.dispose();
   }
 
   void _renameEmployee(String email, String currentName) {
@@ -479,41 +350,22 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                           setDState(() { loading = true; errorText = null; });
 
                           try {
-                            final managerEmail = _managerEmail;
-                            final managerPass = await _ensureManagerPass();
-                            if (managerEmail == null || managerPass == null) {
-                              setDState(() { loading = false; errorText = 'Not signed in'; });
-                              return;
-                            }
-
-                            final auth = FirebaseAuth.instance;
-                            final emp = await context.read<TaskProvider>().getEmployee(email);
-                            final storedPass = emp?['storedPassword'] as String?;
-                            if (storedPass == null) {
-                              await auth.sendPasswordResetEmail(email: email);
-                              newPassCtrl.dispose();
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              if (mounted) toast(context, 'Reset email sent (no stored password)');
-                              return;
-                            }
-
-                            await auth.signInWithEmailAndPassword(
+                            await Callables.setEmployeePassword(
                               email: email,
-                              password: storedPass,
+                              newPassword: newPassCtrl.text,
                             );
-                            await auth.currentUser!.updatePassword(newPassCtrl.text);
-                            await auth.signInWithEmailAndPassword(
-                              email: managerEmail,
-                              password: managerPass,
-                            );
-
-                            await context.read<TaskProvider>().updateEmployeeField(email, {
-                              'storedPassword': newPassCtrl.text,
-                            });
-
                             newPassCtrl.dispose();
                             if (ctx.mounted) Navigator.pop(ctx);
                             if (mounted) toast(context, 'Password changed');
+                          } on FirebaseFunctionsException catch (e) {
+                            setDState(() {
+                              loading = false;
+                              errorText = e.code == 'not-found'
+                                  ? 'No account found with this email'
+                                  : e.code == 'permission-denied'
+                                      ? 'This employee was created by another manager'
+                                      : friendlyError(e);
+                            });
                           } catch (e) {
                             setDState(() {
                               loading = false;
@@ -593,8 +445,25 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                       IconButton(
                         icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
                         onPressed: () async {
-                          final ok = await context.read<TaskProvider>().deleteEmployee(emp['email'] as String? ?? '');
-                          if (mounted && !ok) toast(context, context.read<TaskProvider>().error ?? 'Failed', error: true);
+                          try {
+                            await Callables.deleteEmployee(
+                              email: emp['email'] as String? ?? '',
+                            );
+                          } on FirebaseFunctionsException catch (e) {
+                            if (mounted) {
+                              toast(
+                                context,
+                                e.code == 'permission-denied'
+                                    ? 'This employee was created by another manager'
+                                    : friendlyError(e),
+                                error: true,
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              toast(context, friendlyError(e), error: true);
+                            }
+                          }
                         },
                       ),
                     ],
