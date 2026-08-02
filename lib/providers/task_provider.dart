@@ -320,6 +320,7 @@ class TaskProvider extends ChangeNotifier {
         'photoUrl': photoUrl,
         'completedAt': DateTime.now(),
         'approvedBy': user.email,
+        'rejectionReason': null,
       });
       _addHistory(taskId, 'approved', user.displayName ?? user.email ?? '');
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
@@ -347,6 +348,7 @@ class TaskProvider extends ChangeNotifier {
         'status': 'doing',
         'claimedBy': userEmail,
         'claimedByName': userName,
+        'rejectionReason': null,
       });
       _addHistory(taskId, 'started', userName);
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
@@ -383,6 +385,7 @@ class TaskProvider extends ChangeNotifier {
         'status': 'pending_review',
         'photoUrl': photoUrl,
         'completedAt': DateTime.now(),
+        'rejectionReason': null,
       });
       _addHistory(taskId, 'submitted_proof', user.displayName ?? user.email ?? '');
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
@@ -409,6 +412,7 @@ class TaskProvider extends ChangeNotifier {
       await _firestore.updateTask(taskId, {
         'status': 'completed',
         'approvedBy': approvedBy,
+        'rejectionReason': null,
       });
       _addHistory(taskId, 'approved', approvedBy);
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
@@ -468,6 +472,7 @@ class TaskProvider extends ChangeNotifier {
         'status': 'pending',
         'photoUrl': null,
         'completedAt': null,
+        'rejectionReason': null,
       });
       _addHistory(taskId, 'reassigned', 'to $newEmployee');
       _notif.send(
@@ -494,6 +499,7 @@ class TaskProvider extends ChangeNotifier {
         'claimedByName': null,
         'photoUrl': null,
         'completedAt': null,
+        'rejectionReason': null,
       });
       _addHistory(taskId, 'reset', '');
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
@@ -517,7 +523,7 @@ class TaskProvider extends ChangeNotifier {
 
   Future<bool> updateTaskStatus(String taskId, String newStatus) async {
     try {
-      final updates = <String, dynamic>{'status': newStatus};
+      final updates = <String, dynamic>{'status': newStatus, 'rejectionReason': null};
       if (newStatus == 'completed') updates['completedAt'] = DateTime.now();
       await _firestore.updateTask(taskId, updates);
       _addHistory(taskId, 'status_change', newStatus);
