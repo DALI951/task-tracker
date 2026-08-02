@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -111,49 +112,56 @@ class _AuthGateState extends State<AuthGate> {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString('role_$uid');
 
-    if (cached != null && cached.isNotEmpty) {
-      settings.currentRole = cached;
+    String? role = (cached != null && cached.isNotEmpty) ? cached : null;
+
+    if (role == null) {
+      try {
+        role = await _userService
+            .getRole(uid)
+            .timeout(const Duration(seconds: 10));
+        if (role != null && role.isNotEmpty) {
+          await prefs.setString('role_$uid', role);
+        }
+      } catch (_) {
+        role = cached != null && cached.isNotEmpty ? cached : null;
+      }
+    }
+
+    // Interim "delete" is directory-doc based: a manager removing an employee
+    // deletes employees/{email}. Employees whose directory entry is gone are
+    // blocked from signing in. On read errors (e.g. rules not deployed yet)
+    // fail open so no real employee gets locked out during a rollout.
+    if (role == 'employee' && email.isNotEmpty) {
+      var stillInDirectory = true;
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('employees')
+            .doc(email)
+            .get()
+            .timeout(const Duration(seconds: 10));
+        stillInDirectory = doc.exists;
+      } catch (_) {
+        stillInDirectory = true;
+      }
+      if (!stillInDirectory) {
+        role = '';
+        await prefs.remove('role_$uid');
+      }
+    }
+
+    if (role != null && role.isNotEmpty) {
+      settings.currentRole = role;
       if (mounted) {
         setState(() {
-          _resolvedRole = cached;
+          _resolvedRole = role;
           _loading = false;
         });
       }
-    } else {
-      try {
-        final role = await _userService
-            .getRole(uid)
-            .timeout(const Duration(seconds: 10));
-        if (role != null && role.isNotEmpty && mounted) {
-          await prefs.setString('role_$uid', role);
-          settings.currentRole = role;
-          setState(() {
-            _resolvedRole = role;
-            _loading = false;
-          });
-        } else if (mounted) {
-          // No role document — show "account not configured" instead of
-          // auto-provisioning an employee account for any signed-in user.
-          setState(() {
-            _resolvedRole = '';
-            _loading = false;
-          });
-        }
-      } catch (_) {
-        if (!mounted) return;
-        if (cached != null && cached.isNotEmpty) {
-          settings.currentRole = cached;
-          setState(() {
-            _resolvedRole = cached;
-            _loading = false;
-          });
-        } else {
-          setState(() {
-            _resolvedRole = '';
-            _loading = false;
-          });
-        }
-      }
+    } else if (mounted) {
+      setState(() {
+        _resolvedRole = '';
+        _loading = false;
+      });
     }
   }
 }

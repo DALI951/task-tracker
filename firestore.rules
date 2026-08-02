@@ -58,6 +58,9 @@ service cloud.firestore {
       // Managers: read/update/delete their own employees
       allow read, update, delete: if isAuth() && isManager(request.auth.uid)
         && resource.data.createdBy == userEmail();
+
+      // Employees: read their own directory entry (interim delete check)
+      allow read: if isAuth() && email == userEmail();
     }
 
     // ─── Preset Tasks ─────────────────────────────────────────
