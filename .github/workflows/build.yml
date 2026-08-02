@@ -182,27 +182,33 @@ jobs:
           find artifacts/ -type f \( -name '*.apk' -o -name '*.zip' -o -name '*.exe' -o -name '*.ipa' \) -exec cp {} release_files/ \; 2>/dev/null || true
           ls -la release_files/ || echo "No release files found"
 
+      - name: Generate changelog
+        id: changelog
+        run: |
+          {
+            echo "## Task Tracker v${{ steps.version.outputs.version }}"
+            echo ""
+            echo "### Install"
+            echo "- Android: download and open the .apk (allow unknown sources)"
+            echo "- Web: download and unzip, or use https://dali951.github.io/task-tracker/"
+            echo ""
+            echo "### What's New"
+            echo ""
+          } > body.md
+          PREV=$(git tag --list 'v*' --sort=-version:refname | head -n1 || true)
+          if [ -n "$PREV" ]; then
+            git log --oneline --reverse "$PREV..HEAD" >> body.md
+          else
+            git log --oneline --reverse -20 HEAD >> body.md
+          fi
+          echo "body_path=body.md" >> "$GITHUB_OUTPUT"
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: "Task Tracker v${{ steps.version.outputs.version }}"
-          body: |
-            ## Task Tracker v${{ steps.version.outputs.version }}
-
-            ### Android
-            1. Download `Task-Tracker-v${{ steps.version.outputs.version }}.apk`
-            2. Open on your Android device
-            3. Allow installation from unknown sources if prompted
-            4. Tap Install
-
-            ### Web Version
-            1. Download `Task-Tracker-v${{ steps.version.outputs.version }}-web.zip`
-            2. Extract and open `index.html` in your browser
-            3. Or visit the live version: https://dali951.github.io/task-tracker/
-
-            ### Changes
-            See the commit history for detailed changes.
+          body_path: ${{ steps.changelog.outputs.body_path }}
           files: release_files/*
           draft: false
           prerelease: false
