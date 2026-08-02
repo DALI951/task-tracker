@@ -11,8 +11,10 @@ class FirestoreService {
   CollectionReference get _presetItemsRef => _db.collection('preset_items');
   CollectionReference get _problemsRef => _db.collection('problems');
 
-  Future<void> addTask(AppTask task) async {
-    await _tasksRef.doc(task.id).set(task.toMap());
+  Future<String> addTask(AppTask task) async {
+    final ref = _tasksRef.doc();
+    await ref.set(task.toMap());
+    return ref.id;
   }
 
   Future<void> updateTask(String taskId, Map<String, dynamic> data) async {
@@ -59,7 +61,7 @@ class FirestoreService {
   }
 
   Future<void> addPreset(PresetTask preset) async {
-    await _presetsRef.doc(preset.id).set(preset.toMap());
+    await _presetsRef.add(preset.toMap());
   }
 
   Future<void> deletePreset(String id) async {

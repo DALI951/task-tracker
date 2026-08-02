@@ -248,7 +248,7 @@ class TaskProvider extends ChangeNotifier {
     });
   }
 
-  Future<bool> addTask({
+  Future<String?> addTask({
     required String title,
     String? description,
     required String assignedTo,
@@ -259,10 +259,10 @@ class TaskProvider extends ChangeNotifier {
   }) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) { _error = 'Not signed in'; notifyListeners(); return false; }
+      if (user == null) { _error = 'Not signed in'; notifyListeners(); return null; }
 
       final task = AppTask(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: '',
         title: title,
         description: description,
         assignedTo: assignedTo,
@@ -275,21 +275,21 @@ class TaskProvider extends ChangeNotifier {
         history: [HistoryEvent(action: 'created', by: user.email ?? 'unknown', at: DateTime.now())],
       );
 
-      await _firestore.addTask(task);
+      final taskId = await _firestore.addTask(task);
       final senderName = await _userService.getDisplayName(user.email ?? '');
       _notif.send(
         recipientEmail: assignedToEmail,
         type: 'task_assigned',
         title: _t('notify_task_assigned'),
         message: '"$title" ${_t('notif_task_assigned_msg')}',
-        relatedId: task.id,
+        relatedId: taskId,
         senderName: senderName,
       );
-      return true;
+      return taskId;
     } catch (e) {
       _error = friendlyError(e);
       notifyListeners();
-      return false;
+      return null;
     }
   }
 

@@ -231,7 +231,6 @@ class _ProblemCard extends StatelessWidget {
   void _convertToTask(BuildContext context) {
     final provider = context.read<TaskProvider>();
     final employees = provider.employees;
-    final taskId = DateTime.now().millisecondsSinceEpoch.toString();
 
     showDialog(
       context: context,
@@ -278,7 +277,7 @@ class _ProblemCard extends StatelessWidget {
               ElevatedButton(
                 onPressed: () async {
                   if (selectedEmail == null) return;
-                  await provider.addTask(
+                  final newTaskId = await provider.addTask(
                     title: problem.description.split('\n').first,
                     description: problem.description,
                     assignedTo: selectedName ?? selectedEmail!,
@@ -286,8 +285,10 @@ class _ProblemCard extends StatelessWidget {
                     customer: null,
                     carOrThing: problem.carOrThing,
                   );
-                  await provider.resolveProblem(problem.id, taskId);
-                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (newTaskId != null) {
+                    await provider.resolveProblem(problem.id, newTaskId);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  }
                 },
                 child: Text(context.read<SettingsService>().t('create')),
               ),

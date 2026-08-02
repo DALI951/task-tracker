@@ -204,7 +204,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                     (e) => e['email'] == _selectedEmployeeEmail,
                     orElse: () => {},
                   );
-                  final ok = await context.read<TaskProvider>().addTask(
+                  final taskId = await context.read<TaskProvider>().addTask(
                         title: _titleCtrl.text.trim(),
                         description: _descCtrl.text.trim().isEmpty
                             ? null
@@ -216,7 +216,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                       );
                   if (ctx.mounted) {
                     UpdateService().suppressUpdates = false;
-                    if (ok) {
+                    if (taskId != null) {
                       Navigator.pop(ctx);
                     } else {
                       toast(context, context.read<TaskProvider>().error ?? t('failed'), error: true);
