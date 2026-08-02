@@ -16,7 +16,6 @@ android/app/build/
 android/build/
 *.apk
 *.aab
-!releases/*.apk
 local.properties
 android/app/release-key.jks
 android/app/release-key.jks.base64
