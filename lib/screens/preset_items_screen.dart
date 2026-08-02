@@ -65,8 +65,19 @@ class _PresetItemsScreenState extends State<PresetItemsScreen> {
       appBar: AppBar(title: Text(t('manage_items'))),
       body: items.isEmpty
           ? Center(
-              child: Text(t('no_items'),
-                  style: TextStyle(color: Colors.grey.shade600)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(t('no_items'),
+                      style: TextStyle(color: Colors.grey.shade600)),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _addItem,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(t('add_item')),
+                  ),
+                ],
+              ),
             )
           : ListView.builder(
               itemCount: items.length,

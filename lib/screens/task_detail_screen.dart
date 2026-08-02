@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
+import 'package:task_tracker/screens/manage_employees_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/storage_service.dart';
@@ -263,7 +264,31 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Future<void> _showReassignDialog() async {
     final employees = context.read<TaskProvider>().employees;
-    if (employees.isEmpty) return;
+    if (employees.isEmpty) {
+      final create = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(t('no_employees')),
+          content: Text(t('create_employee_first')),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(t('cancel'))),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(t('create_employee')),
+            ),
+          ],
+        ),
+      );
+      if (create == true && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ManageEmployeesScreen()),
+        );
+      }
+      return;
+    }
     String? selectedEmail;
 
     final result = await showDialog<String>(

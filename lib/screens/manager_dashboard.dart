@@ -64,6 +64,34 @@ class _ManagerDashboardState extends State<ManagerDashboard>
   }
 
   void _showCreateTaskDialog() {
+    final provider = context.read<TaskProvider>();
+    final t = context.read<SettingsService>().t;
+    if (provider.employees.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(t('no_employees')),
+          content: Text(t('create_employee_first')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ManageEmployeesScreen()),
+                );
+              },
+              child: Text(t('create_employee')),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     _titleCtrl.clear();
     _descCtrl.clear();
     _selectedPresetId = null;

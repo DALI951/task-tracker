@@ -414,6 +414,12 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                   const SizedBox(height: 12),
                   Text(t('no_employees'),
                       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _addEmployee,
+                    icon: const Icon(Icons.person_add, size: 18),
+                    label: Text(t('create_employee')),
+                  ),
                 ],
               ),
             )
