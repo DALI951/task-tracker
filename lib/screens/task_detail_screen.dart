@@ -9,6 +9,7 @@ import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
@@ -229,11 +230,21 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           children: [
             Center(
               child: InteractiveViewer(
-                child: Image.memory(
-                  base64Decode(widget.task.photoUrl!),
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.white54, size: 64)),
-                ),
+                child: StorageService.isRemotePhoto(widget.task.photoUrl!)
+                    ? Image.network(
+                        widget.task.photoUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.broken_image,
+                                color: Colors.white54, size: 64)),
+                      )
+                    : Image.memory(
+                        base64Decode(widget.task.photoUrl!),
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.broken_image,
+                                color: Colors.white54, size: 64)),
+                      ),
               ),
             ),
             PositionedDirectional(
@@ -447,17 +458,33 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 onTap: _showPhotoGallery,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(Brand.radiusMd),
-                  child: Image.memory(
-                    base64Decode(task.photoUrl!),
-                    width: double.infinity,
-                    height: 250,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 200,
-                      color: cs.surfaceContainerHighest,
-                      child: Center(child: Icon(Icons.broken_image, size: 48, color: cs.outline)),
-                    ),
-                  ),
+                  child: StorageService.isRemotePhoto(task.photoUrl!)
+                      ? Image.network(
+                          task.photoUrl!,
+                          width: double.infinity,
+                          height: 250,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            height: 200,
+                            color: cs.surfaceContainerHighest,
+                            child: Center(
+                                child: Icon(Icons.broken_image,
+                                    size: 48, color: cs.outline)),
+                          ),
+                        )
+                      : Image.memory(
+                          base64Decode(task.photoUrl!),
+                          width: double.infinity,
+                          height: 250,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            height: 200,
+                            color: cs.surfaceContainerHighest,
+                            child: Center(
+                                child: Icon(Icons.broken_image,
+                                    size: 48, color: cs.outline)),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 4),

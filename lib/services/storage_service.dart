@@ -1,12 +1,18 @@
-import 'dart:convert';
 import 'dart:typed_data';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class StorageService {
-  String encodeImage(Uint8List bytes) {
-    return base64Encode(bytes);
+  /// Uploads image bytes to Firebase Storage and returns the download URL.
+  Future<String> uploadImage(Uint8List bytes, String path) async {
+    final ref = FirebaseStorage.instance.ref(path);
+    final task =
+        await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+    return await task.ref.getDownloadURL();
   }
 
-  Uint8List decodeImage(String base64String) {
-    return base64Decode(base64String);
+  /// True for remote Storage download URLs (the new photo format). False for
+  /// legacy inline base64 data stored on older task/problem documents.
+  static bool isRemotePhoto(String value) {
+    return value.startsWith('http://') || value.startsWith('https://');
   }
 }

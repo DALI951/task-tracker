@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,7 +18,7 @@ class ReportProblemScreen extends StatefulWidget {
 
 class _ReportProblemScreenState extends State<ReportProblemScreen> {
   final _descCtrl = TextEditingController();
-  String? _photoBase64;
+  Uint8List? _photoBytes;
   String? _selectedCarOrThing;
   bool _sending = false;
 
@@ -39,7 +39,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
-    setState(() => _photoBase64 = base64Encode(bytes));
+    setState(() => _photoBytes = bytes);
   }
 
   Future<void> _send() async {
@@ -53,7 +53,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             reportedBy: user.email ?? '',
             reporterName: name,
             description: _descCtrl.text.trim(),
-            photoUrl: _photoBase64,
+            photoBytes: _photoBytes,
             carOrThing: _selectedCarOrThing,
           );
       if (mounted) {
@@ -109,11 +109,11 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               onChanged: (v) => setState(() => _selectedCarOrThing = v),
             ),
           const SizedBox(height: 16),
-          if (_photoBase64 != null)
+          if (_photoBytes != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.memory(
-                base64Decode(_photoBase64!),
+                _photoBytes!,
                 height: 180,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -123,7 +123,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           OutlinedButton.icon(
             onPressed: _takePhoto,
             icon: const Icon(Icons.camera_alt),
-            label: Text(_photoBase64 == null ? t('take_photo') : t('retake')),
+            label: Text(_photoBytes == null ? t('take_photo') : t('retake')),
           ),
           const SizedBox(height: 24),
           SizedBox(

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
+import 'package:task_tracker/services/storage_service.dart';
 
 class TaskCard extends StatelessWidget {
   final AppTask task;
@@ -112,19 +113,33 @@ class TaskCard extends StatelessWidget {
                   padding: const EdgeInsetsDirectional.only(start: 8),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(Brand.radiusSm),
-                    child: Image.memory(
-                      base64Decode(task.photoUrl!),
-                      width: 48,
-                      height: 48,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 48,
-                        height: 48,
-                        color: cs.surfaceContainerHighest,
-                        child: Icon(Icons.broken_image,
-                            size: 24, color: cs.outline),
-                      ),
-                    ),
+                    child: StorageService.isRemotePhoto(task.photoUrl!)
+                        ? Image.network(
+                            task.photoUrl!,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 48,
+                              height: 48,
+                              color: cs.surfaceContainerHighest,
+                              child: Icon(Icons.broken_image,
+                                  size: 24, color: cs.outline),
+                            ),
+                          )
+                        : Image.memory(
+                            base64Decode(task.photoUrl!),
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 48,
+                              height: 48,
+                              color: cs.surfaceContainerHighest,
+                              child: Icon(Icons.broken_image,
+                                  size: 24, color: cs.outline),
+                            ),
+                          ),
                   ),
                 ),
             ],

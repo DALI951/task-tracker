@@ -6,6 +6,7 @@ import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/storage_service.dart';
 
 class ProblemsScreen extends StatefulWidget {
   const ProblemsScreen({super.key});
@@ -184,17 +185,31 @@ class _ProblemCard extends StatelessWidget {
               const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(Brand.radiusSm),
-                child: Image.memory(
-                  base64Decode(problem.photoUrl!),
-                  width: double.infinity,
-                  height: 160,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 80,
-                    color: cs.surfaceContainerHighest,
-                    child: Center(child: Icon(Icons.broken_image, color: cs.outline)),
-                  ),
-                ),
+                child: StorageService.isRemotePhoto(problem.photoUrl!)
+                    ? Image.network(
+                        problem.photoUrl!,
+                        width: double.infinity,
+                        height: 160,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 80,
+                          color: cs.surfaceContainerHighest,
+                          child:
+                              Center(child: Icon(Icons.broken_image, color: cs.outline)),
+                        ),
+                      )
+                    : Image.memory(
+                        base64Decode(problem.photoUrl!),
+                        width: double.infinity,
+                        height: 160,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 80,
+                          color: cs.surfaceContainerHighest,
+                          child:
+                              Center(child: Icon(Icons.broken_image, color: cs.outline)),
+                        ),
+                      ),
               ),
             ],
             if (problem.isOpen)

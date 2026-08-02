@@ -311,10 +311,13 @@ class TaskProvider extends ChangeNotifier {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) { _error = 'Not signed in'; notifyListeners(); return false; }
-      final photoBase64 = _storage.encodeImage(imageBytes);
+      final photoUrl = await _storage.uploadImage(
+        imageBytes,
+        'task_photos/$taskId/proof_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
       await _firestore.updateTask(taskId, {
         'status': 'completed',
-        'photoUrl': photoBase64,
+        'photoUrl': photoUrl,
         'completedAt': DateTime.now(),
         'approvedBy': user.email,
       });
@@ -372,10 +375,13 @@ class TaskProvider extends ChangeNotifier {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) { _error = 'Not signed in'; notifyListeners(); return false; }
-      final photoBase64 = _storage.encodeImage(imageBytes);
+      final photoUrl = await _storage.uploadImage(
+        imageBytes,
+        'task_photos/$taskId/proof_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
       await _firestore.updateTask(taskId, {
         'status': 'pending_review',
-        'photoUrl': photoBase64,
+        'photoUrl': photoUrl,
         'completedAt': DateTime.now(),
       });
       _addHistory(taskId, 'submitted_proof', user.displayName ?? user.email ?? '');
@@ -594,10 +600,17 @@ class TaskProvider extends ChangeNotifier {
     required String reportedBy,
     required String reporterName,
     required String description,
-    String? photoUrl,
+    Uint8List? photoBytes,
     String? carOrThing,
   }) async {
     try {
+      String? photoUrl;
+      if (photoBytes != null) {
+        photoUrl = await _storage.uploadImage(
+          photoBytes,
+          'problem_photos/${reportedBy}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+      }
       await _firestore.addProblem({
         'reportedBy': reportedBy,
         'reporterName': reporterName,
