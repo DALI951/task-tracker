@@ -685,18 +685,13 @@ class TaskProvider extends ChangeNotifier {
 
   void _addHistory(String taskId, String action, String detail) {
     final user = FirebaseAuth.instance.currentUser;
-    final task = _tasks.where((t) => t.id == taskId).firstOrNull;
-    if (task == null) return;
     final event = HistoryEvent(
       action: action,
       by: user?.displayName ?? user?.email ?? 'unknown',
       detail: detail,
       at: DateTime.now(),
     );
-    final updatedHistory = [...task.history, event];
-    _firestore.updateTask(taskId, {
-      'history': updatedHistory.map((e) => e.toMap()).toList(),
-    });
+    _firestore.appendHistory(taskId, event.toMap());
   }
 
   @override

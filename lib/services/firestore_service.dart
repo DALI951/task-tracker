@@ -21,6 +21,20 @@ class FirestoreService {
     await _tasksRef.doc(taskId).update(data);
   }
 
+  Future<void> appendHistory(String taskId, Map<String, dynamic> event, {int cap = 50}) async {
+    final docRef = _tasksRef.doc(taskId);
+    await _db.runTransaction((txn) async {
+      final snap = await txn.get(docRef);
+      final data = snap.data() as Map<String, dynamic>?;
+      final history = List<Map<String, dynamic>>.from((data?['history'] as List?) ?? []);
+      history.add(event);
+      if (history.length > cap) {
+        history.removeRange(0, history.length - cap);
+      }
+      txn.update(docRef, {'history': history});
+    });
+  }
+
   Future<void> deleteTask(String taskId) async {
     await _tasksRef.doc(taskId).delete();
   }
