@@ -108,9 +108,9 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                         onChanged: (v) {
                           setDialogState(() {
                             _selectedPresetId = v;
-                            if (v != null) {
-                              final preset =
-                                  presets.firstWhere((p) => p.id == v);
+                            final preset =
+                                presets.where((p) => p.id == v).firstOrNull;
+                            if (preset != null) {
                               _titleCtrl.text = preset.name;
                               _descCtrl.text = preset.defaultDescription ?? '';
                             } else {
@@ -167,7 +167,8 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                             style: TextStyle(color: Colors.grey.shade600)),
                       ),
                     if (_selectedPresetId == null ||
-                        presets.firstWhere((p) => p.id == _selectedPresetId).requireCarOrThing)
+                        presets.where((p) => p.id == _selectedPresetId).firstOrNull?.requireCarOrThing ??
+                            false)
                       DropdownButtonFormField<String>(
                         value: _selectedCarOrThing,
                         decoration: InputDecoration(
