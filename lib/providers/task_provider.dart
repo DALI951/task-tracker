@@ -693,12 +693,19 @@ class TaskProvider extends ChangeNotifier {
   }
 
   Future<void> exportToClipboard() async {
+    String csvField(String value) => '"${value.replaceAll('"', '""')}"';
+
     final buffer = StringBuffer();
     buffer.writeln('Title,Description,AssignedTo,Status,Created,Completed');
     for (final task in _tasks) {
-      buffer.writeln(
-        '"${task.title}","${task.description ?? ''}","${task.assignedTo}","${task.status}","${task.createdAt.toIso8601String()}","${task.completedAt?.toIso8601String() ?? ''}"',
-      );
+      buffer.writeln([
+        csvField(task.title),
+        csvField(task.description ?? ''),
+        csvField(task.assignedTo),
+        csvField(task.status),
+        csvField(task.createdAt.toIso8601String()),
+        csvField(task.completedAt?.toIso8601String() ?? ''),
+      ].join(','));
     }
     await Clipboard.setData(ClipboardData(text: buffer.toString()));
   }
