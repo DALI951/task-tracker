@@ -193,3 +193,67 @@ exports.setEmployeePassword = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', e.message);
   }
 });
+
+// Pushes a notification to the recipient's device when a notification
+// document is created. Replaces the client-side FCM sender that shipped a
+// service account inside the app binaries.
+exports.onNotificationCreated = functions.firestore
+  .document('notifications/{notificationId}')
+  .onCreate(async (snap) => {
+    try {
+      const data = snap.data() || {};
+      const recipientEmail = data.recipientEmail;
+      if (!recipientEmail) return;
+
+      const users = await db.collection('users')
+        .where('email', '==', recipientEmail)
+        .limit(1)
+        .get();
+      if (users.empty) return;
+
+      const fcmToken = users.docs[0].data().fcmToken;
+      if (!fcmToken) return;
+
+      await admin.messaging().send({
+        token: fcmToken,
+        notification: {
+          title: String(data.title || 'Task Tracker'),
+          body: String(data.message || ''),
+        },
+        data: {
+          type: String(data.type || ''),
+          relatedId: String(data.relatedId || ''),
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        },
+        android: {
+          priority: 'high',
+        },
+      });
+    } catch (e) {
+      functions.logger.warn('Failed to send FCM notification', e);
+    }
+  });
+
+// Tags a reported problem with the manager email of the reporting employee,
+// so managers only see problems belonging to their own employees.
+exports.onProblemCreated = functions.firestore
+  .document('problems/{problemId}')
+  .onCreate(async (snap) => {
+    try {
+      const data = snap.data() || {};
+      if (data.managerEmail) return;
+
+      const reportedBy = data.reportedBy;
+      if (!reportedBy) return;
+
+      const empDoc = await db.doc(`employees/${reportedBy}`).get();
+      if (!empDoc.exists) return;
+
+      const managerEmail = empDoc.data().createdBy || null;
+      if (!managerEmail) return;
+
+      await snap.ref.update({ managerEmail });
+    } catch (e) {
+      functions.logger.warn('Failed to tag problem managerEmail', e);
+    }
+  });
