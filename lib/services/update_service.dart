@@ -17,6 +17,8 @@ class UpdateService {
   static const _retryUrlKey = 'retry_url';
   static const _retryBodyKey = 'retry_body';
   static const _lastCheckKey = 'last_update_check';
+  static const _releaseBodyKey = 'last_release_body';
+  static const _releaseVersionKey = 'last_release_version';
 
   bool isOnHomeScreen = false;
   bool suppressUpdates = false;
@@ -83,6 +85,8 @@ class UpdateService {
       if (_compareVersions(latestVersion, currentVersion) <= 0) return false;
 
       await prefs.setInt(_lastCheckKey, DateTime.now().millisecondsSinceEpoch);
+      await prefs.setString(_releaseBodyKey, body);
+      await prefs.setString(_releaseVersionKey, latestVersion);
 
       if (!force) {
         final dismissed = prefs.getString(_dismissedKey);
@@ -108,6 +112,30 @@ class UpdateService {
       if (av != bv) return av.compareTo(bv);
     }
     return 0;
+  }
+
+  Future<({String version, String body})?> fetchLatestRelease() async {
+    try {
+      final response = await _dio.get(_apiUrl);
+      final data = response.data as Map<String, dynamic>;
+      final body = data['body'] as String? ?? '';
+      final version =
+          (data['tag_name'] as String? ?? '').replaceFirst('v', '');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_releaseBodyKey, body);
+      await prefs.setString(_releaseVersionKey, version);
+      return (version: version, body: body);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<({String version, String body})?> cachedLatestRelease() async {
+    final prefs = await SharedPreferences.getInstance();
+    final version = prefs.getString(_releaseVersionKey) ?? '';
+    final body = prefs.getString(_releaseBodyKey) ?? '';
+    if (version.isEmpty) return null;
+    return (version: version, body: body);
   }
 
   void _showUpdateModal(

@@ -16,6 +16,7 @@ import 'package:task_tracker/services/update_service.dart';
 
 import 'package:task_tracker/utils/error_handler.dart';
 import 'package:task_tracker/widgets/task_card.dart';
+import 'package:task_tracker/widgets/update_banner.dart';
 
 class ManagerDashboard extends StatefulWidget {
   const ManagerDashboard({super.key});
@@ -337,11 +338,18 @@ class _ManagerDashboardState extends State<ManagerDashboard>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildTasksTab(settings, provider),
-          const ProblemsScreen(),
+          const UpdateBanner(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTasksTab(settings, provider),
+                const ProblemsScreen(),
+              ],
+            ),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -356,11 +364,10 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     final allTasks = provider.tasks;
     final filtered = _filterTasks(allTasks);
 
-    final total = allTasks.length;
+    final total = allTasks.where((x) => !x.isCompleted).length;
     final pending = allTasks.where((x) => x.isPending).length;
     final doing = allTasks.where((x) => x.isDoing).length;
     final review = allTasks.where((x) => x.isPendingReview).length;
-    final completed = allTasks.where((x) => x.isCompleted).length;
     final problemCount = provider.problems.where((p) => p.status == 'open' || p.status == 'assigned').length;
 
     if (filtered.isEmpty && allTasks.isEmpty) {
@@ -412,7 +419,6 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                 _statCard(t('pending'), pending.toString(), Colors.orange),
                 _statCard(t('doing'), doing.toString(), Colors.blue.shade300),
                 _statCard(t('pending_review'), review.toString(), Colors.purple),
-                _statCard(t('done'), completed.toString(), Colors.green),
                 _statCard(t('open_problems'), problemCount.toString(), Colors.red),
               ],
             ),

@@ -10,6 +10,7 @@ import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_gate.dart';
 import 'package:task_tracker/services/push_notification_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/update_download_manager.dart';
 import 'package:task_tracker/services/update_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -80,6 +81,7 @@ class TaskTrackerApp extends StatelessWidget {
           s.load();
           return s;
         }),
+        ChangeNotifierProvider(create: (_) => UpdateDownloadManager()),
       ],
       child: Builder(
         builder: (context) {

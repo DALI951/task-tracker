@@ -13,6 +13,7 @@ import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
 
 import 'package:task_tracker/widgets/task_card.dart';
+import 'package:task_tracker/widgets/update_banner.dart';
 
 class EmployeeTasksScreen extends StatefulWidget {
   const EmployeeTasksScreen({super.key});
@@ -110,6 +111,7 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
       ),
       body: Column(
         children: [
+          const UpdateBanner(),
           if (provider.loading && provider.error == null)
             const LinearProgressIndicator(),
           if (provider.error != null)
