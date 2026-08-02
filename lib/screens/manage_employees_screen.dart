@@ -212,7 +212,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                   onPressed: loading
                       ? null
                       : () => run(
-                            Callables.setEmployeePassword(
+                            () => Callables.setEmployeePassword(
                               email: email,
                               newPassword: password,
                             ),
@@ -224,7 +224,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                   onPressed: loading
                       ? null
                       : () => run(
-                            Callables.createEmployee(
+                            () => Callables.createEmployee(
                               email: email,
                               name: name,
                               password: password,
@@ -238,7 +238,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                   onPressed: loading
                       ? null
                       : () => run(
-                            Callables.createEmployee(
+                            () => Callables.createEmployee(
                               email: email,
                               name: name,
                               password: password,

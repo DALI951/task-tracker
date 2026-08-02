@@ -195,8 +195,8 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                             style: TextStyle(color: Colors.grey.shade600)),
                       ),
                     if (_selectedPresetId == null ||
-                        presets.where((p) => p.id == _selectedPresetId).firstOrNull?.requireCarOrThing ??
-                            false)
+                        (presets.where((p) => p.id == _selectedPresetId).firstOrNull?.requireCarOrThing ??
+                            false))
                       DropdownButtonFormField<String>(
                         value: _selectedCarOrThing,
                         decoration: InputDecoration(
