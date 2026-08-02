@@ -3,98 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Tracker - Account Creator</title>
+    <title>Task Tracker - Manager Invite</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .card { background: white; border-radius: 12px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+        .card { background: white; border-radius: 12px; padding: 32px; width: 100%; max-width: 440px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
         .header { text-align: center; margin-bottom: 24px; }
         .header .icon { width: 56px; height: 56px; background: #E53935; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
         .header .icon svg { width: 28px; height: 28px; fill: white; }
         .header h1 { font-size: 20px; color: #1a1a1a; }
         .header p { font-size: 13px; color: #666; margin-top: 4px; }
-        .gate { text-align: center; }
-        .gate input { width: 100%; padding: 12px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 12px; }
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; }
-        .form-group input, .form-group select { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
-        .form-group input:focus, .form-group select:focus { outline: none; border-color: #E53935; box-shadow: 0 0 0 3px rgba(229,57,53,0.1); }
+        .form-group input { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        .form-group input:focus { outline: none; border-color: #E53935; box-shadow: 0 0 0 3px rgba(229,57,53,0.1); }
         .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
         .btn-primary { background: #E53935; color: white; }
         .btn-primary:hover { background: #C62828; }
         .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
         .btn-secondary { background: #f0f0f0; color: #333; margin-top: 8px; }
         .btn-secondary:hover { background: #e0e0e0; }
+        .btn-small { width: auto; padding: 6px 12px; font-size: 13px; border-radius: 6px; }
         .message { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
         .message.success { background: #e8f5e9; color: #2e7d32; }
         .message.error { background: #ffebee; color: #c62828; }
         .hidden { display: none; }
-        .role-options { display: flex; gap: 12px; }
-        .role-options label { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 8px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.15s; }
-        .role-options input[type="radio"] { display: none; }
-        .role-options input[type="radio"]:checked + span { color: #E53935; }
-        .role-options label:has(input:checked) { border-color: #E53935; background: #fff5f5; }
+        .muted { color: #888; font-size: 12px; }
+        .invite-box { margin-top: 16px; }
+        .invite-box .invite-url { display: flex; gap: 8px; margin-top: 8px; }
+        .invite-box .invite-url input { flex: 1; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 12px; color: #333; background: #fafafa; }
+        .invite-list { margin-top: 16px; max-height: 240px; overflow-y: auto; }
+        .invite-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+        .invite-row:last-child { border-bottom: none; }
+        .invite-code { font-family: monospace; font-size: 13px; color: #1a1a1a; }
+        .invite-actions { display: flex; align-items: center; gap: 8px; }
+        .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+        .badge-unused { background: #e8f5e9; color: #2e7d32; }
+        .badge-used { background: #eceff1; color: #607d8b; }
+        .section-title { font-size: 13px; font-weight: 600; color: #333; margin: 16px 0 8px; }
+        .divider { height: 1px; background: #eee; margin: 16px 0; }
+        .owner-link { text-align: center; margin-top: 16px; }
+        .owner-link button { background: none; border: none; color: #E53935; font-size: 13px; cursor: pointer; }
+        .success-icon { text-align: center; margin-bottom: 8px; }
+        .success-icon svg { width: 56px; height: 56px; fill: #2e7d32; }
     </style>
 </head>
 <body>
     <div class="card">
-        <!-- Admin Gate -->
-        <div id="gateScreen" class="gate">
+        <!-- No-invite landing (visitors without a link) -->
+        <div id="noInviteScreen" class="screen">
             <div class="header">
                 <div class="icon">
-                    <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+                    <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
                 </div>
                 <h1>Task Tracker</h1>
-                <p>Admin Access Required</p>
+                <p>This page is by invitation only.</p>
             </div>
-            <input type="password" id="adminPass" placeholder="Admin passphrase" onkeypress="if(event.key==='Enter')authGate()">
-            <button class="btn btn-primary" onclick="authGate()">Continue</button>
+            <p style="text-align:center;font-size:13px;color:#666;">To create a manager account, ask the owner for a private invite link.</p>
+            <div class="owner-link"><button onclick="showOwnerLogin()">Sign in as owner</button></div>
         </div>
 
-        <!-- Account Creation Form -->
-        <div id="formScreen" class="hidden">
+        <!-- Owner login -->
+        <div id="loginScreen" class="screen hidden">
+            <div class="header">
+                <div class="icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                </div>
+                <h1>Owner Sign In</h1>
+                <p>Generate and manage manager invites</p>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="ownerEmail" placeholder="owner@example.com">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="ownerPass" placeholder="Password" onkeypress="if(event.key==='Enter')ownerLogin()">
+            </div>
+            <button class="btn btn-primary" id="ownerLoginBtn" onclick="ownerLogin()">Sign In</button>
+            <button class="btn btn-secondary" onclick="showNoInvite()">Back</button>
+            <div id="loginMsg"></div>
+        </div>
+
+        <!-- Invite signup -->
+        <div id="signupScreen" class="screen hidden">
             <div class="header">
                 <div class="icon">
                     <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                 </div>
-                <h1>Create Account</h1>
-                <p>Register a new user for the app</p>
+                <h1>Create Manager Account</h1>
+                <p>You were invited to become a manager</p>
+            </div>
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="suName" placeholder="John Doe">
             </div>
             <div class="form-group">
                 <label>Email</label>
-                <input type="email" id="email" placeholder="user@example.com">
+                <input type="email" id="suEmail" placeholder="user@example.com">
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="password" placeholder="Min 6 characters">
+                <input type="password" id="suPass" placeholder="Min 6 characters">
             </div>
             <div class="form-group">
-                <label>Display Name</label>
-                <input type="text" id="displayName" placeholder="John Doe">
-            </div>
-            <div class="form-group">
-                <label>Role</label>
-                <div class="role-options">
-                    <label>
-                        <input type="radio" name="role" value="manager" checked>
-                        <span>Manager</span>
-                    </label>
-                    <label>
-                        <input type="radio" name="role" value="employee">
-                        <span>Employee</span>
-                    </label>
-                </div>
+                <label>Confirm Password</label>
+                <input type="password" id="suPass2" placeholder="Repeat password" onkeypress="if(event.key==='Enter')createAccount()">
             </div>
             <button class="btn btn-primary" id="createBtn" onclick="createAccount()">Create Account</button>
-            <button class="btn btn-secondary" onclick="signOutAdmin()">Sign Out</button>
-            <div id="message"></div>
+            <div id="signupMsg"></div>
+        </div>
+
+        <!-- Success -->
+        <div id="successScreen" class="screen hidden">
+            <div class="header">
+                <div class="success-icon">
+                    <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                </div>
+                <h1>Account Created</h1>
+                <p>You can now sign in with your email and password in the app.</p>
+            </div>
+            <button class="btn btn-secondary" onclick="location.href='index.html'">Done</button>
+        </div>
+
+        <!-- Owner console -->
+        <div id="consoleScreen" class="screen hidden">
+            <div class="header">
+                <div class="icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+                </div>
+                <h1>Owner Console</h1>
+                <p>Generate one-time manager invites</p>
+            </div>
+
+            <div class="section-title">New invite</div>
+            <button class="btn btn-primary" id="genBtn" onclick="generateInvite()">Generate Invite Link</button>
+            <div id="newInviteWrap" class="invite-box hidden">
+                <label class="muted">Send this private link to the person you approved:</label>
+                <div class="invite-url">
+                    <input type="text" id="newInvite" readonly onclick="this.select()">
+                    <button class="btn btn-primary btn-small" onclick="copyNewInvite()">Copy</button>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section-title">Recent invites</div>
+            <div id="inviteList" class="invite-list"></div>
+
+            <div class="divider"></div>
+
+            <div class="section-title">Maintenance</div>
+            <button class="btn btn-secondary" onclick="runBackfill()">Backfill problem managers (one-time)</button>
+
+            <button class="btn btn-secondary" onclick="ownerSignOut()">Sign Out</button>
+            <div id="consoleMsg"></div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
-        import { getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
-        import { getFirestore, doc, setDoc } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-functions.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyCq3-FOmjHuQH86QfA5Vf7c8hyneS0nbC0",
@@ -107,32 +177,61 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
+        const fns = getFunctions(app, 'us-central1');
+        const redeemInvite = httpsCallable(fns, 'redeemInvite');
+        const createInvite = httpsCallable(fns, 'createInvite');
+        const listInvites = httpsCallable(fns, 'listInvites');
+        const backfill = httpsCallable(fns, 'backfillProblemManagers');
 
-        const ADMIN_PASS = 'tasktracker2024';
+        const params = new URLSearchParams(location.search);
+        const inviteCode = params.get('invite') || '';
 
-        window.authGate = function() {
-            const pass = document.getElementById('adminPass').value;
-            if (pass !== ADMIN_PASS) {
-                showMessage('Invalid passphrase', 'error');
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function showMessage(text, type, id) {
+            const el = document.getElementById(id);
+            el.className = 'message ' + type;
+            el.textContent = text;
+            setTimeout(() => { el.textContent = ''; el.className = ''; }, 6000);
+        }
+
+        window.showOwnerLogin = function () { showScreen('loginScreen'); };
+        window.showNoInvite = function () { showScreen('noInviteScreen'); };
+
+        onAuthStateChanged(auth, (user) => {
+            if (inviteCode) {
+                showScreen('signupScreen');
                 return;
             }
-            document.getElementById('gateScreen').classList.add('hidden');
-            document.getElementById('formScreen').classList.remove('hidden');
-        };
+            if (user) {
+                showScreen('consoleScreen');
+                loadInvites();
+            } else {
+                showScreen('noInviteScreen');
+            }
+        });
 
-        window.createAccount = async function() {
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            const displayName = document.getElementById('displayName').value.trim();
-            const role = document.querySelector('input[name="role"]:checked').value;
+        // ── Invite redemption ──────────────────────────────────
 
-            if (!email || !password || !displayName) {
-                showMessage('All fields are required', 'error');
+        window.createAccount = async function () {
+            const name = document.getElementById('suName').value.trim();
+            const email = document.getElementById('suEmail').value.trim();
+            const password = document.getElementById('suPass').value;
+            const password2 = document.getElementById('suPass2').value;
+
+            if (!name || !email || !password) {
+                showMessage('All fields are required', 'error', 'signupMsg');
                 return;
             }
             if (password.length < 6) {
-                showMessage('Password must be at least 6 characters', 'error');
+                showMessage('Password must be at least 6 characters', 'error', 'signupMsg');
+                return;
+            }
+            if (password !== password2) {
+                showMessage('Passwords do not match', 'error', 'signupMsg');
                 return;
             }
 
@@ -141,81 +240,128 @@
             btn.textContent = 'Creating...';
 
             try {
-                const response = await fetch(
-                    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            email: email,
-                            password: password,
-                            returnSecureToken: true
-                        })
-                    }
-                );
-
-                const data = await response.json();
-
-                if (data.error) {
-                    showMessage(data.error.message, 'error');
-                    btn.disabled = false;
-                    btn.textContent = 'Create Account';
-                    return;
-                }
-
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                const uid = userCredential.user.uid;
-
-                const batch = [
-                    setDoc(doc(db, 'users', uid), {
-                        email: email,
-                        displayName: displayName,
-                        role: role,
-                        createdAt: new Date().toISOString()
-                    })
-                ];
-
-                if (role === 'employee') {
-                    batch.push(setDoc(doc(db, 'employees', email), {
-                        email: email,
-                        name: displayName,
-                        displayName: displayName,
-                        createdBy: 'web_admin',
-                        createdAt: new Date().toISOString()
-                    }));
-                }
-
-                await Promise.all(batch);
-                await signOut(auth);
-
-                showMessage(`Account created: ${email} (${role})`, 'success');
-
-                document.getElementById('email').value = '';
-                document.getElementById('password').value = '';
-                document.getElementById('displayName').value = '';
-
-                btn.disabled = false;
-                btn.textContent = 'Create Account';
+                await redeemInvite({ code: inviteCode, email: email, name: name, password: password });
+                showScreen('successScreen');
             } catch (e) {
-                showMessage(e.message || 'Failed to create account', 'error');
+                let msg = e.message || 'Failed to create account';
+                if (e.code === 'functions/not-found') msg = 'Invalid invite link. Ask the owner for a fresh one.';
+                if (e.code === 'functions/already-exists') msg = 'This invite has already been used, or an account with this email already exists.';
+                showMessage(msg, 'error', 'signupMsg');
+            } finally {
                 btn.disabled = false;
                 btn.textContent = 'Create Account';
             }
         };
 
-        window.signOutAdmin = function() {
-            signOut(auth);
-            document.getElementById('formScreen').classList.add('hidden');
-            document.getElementById('gateScreen').classList.remove('hidden');
-            document.getElementById('adminPass').value = '';
+        // ── Owner login ────────────────────────────────────────
+
+        window.ownerLogin = async function () {
+            const email = document.getElementById('ownerEmail').value.trim();
+            const password = document.getElementById('ownerPass').value;
+            if (!email || !password) {
+                showMessage('Enter your email and password', 'error', 'loginMsg');
+                return;
+            }
+            const btn = document.getElementById('ownerLoginBtn');
+            btn.disabled = true;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (e) {
+                showMessage('Sign-in failed. Check your credentials.', 'error', 'loginMsg');
+            } finally {
+                btn.disabled = false;
+            }
         };
 
-        function showMessage(text, type) {
-            const el = document.getElementById('message');
-            el.className = `message ${type}`;
-            el.textContent = text;
-            setTimeout(() => { el.textContent = ''; el.className = ''; }, 5000);
+        window.ownerSignOut = function () {
+            signOut(auth);
+            showScreen('noInviteScreen');
+        };
+
+        // ── Owner console ──────────────────────────────────────
+
+        function inviteUrl(code) {
+            return location.origin + location.pathname + '?invite=' + code;
         }
+
+        window.generateInvite = async function () {
+            const btn = document.getElementById('genBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            try {
+                const res = await createInvite();
+                const url = res.data.url || inviteUrl(res.data.code);
+                document.getElementById('newInvite').value = url;
+                document.getElementById('newInviteWrap').classList.remove('hidden');
+                loadInvites();
+            } catch (e) {
+                if (e.code === 'functions/permission-denied') {
+                    showMessage('Your account is not allowed to generate invites.', 'error', 'consoleMsg');
+                } else {
+                    showMessage(e.message || 'Failed to generate invite', 'error', 'consoleMsg');
+                }
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate Invite Link';
+            }
+        };
+
+        window.copyNewInvite = async function () {
+            const val = document.getElementById('newInvite').value;
+            await navigator.clipboard.writeText(val);
+            const btn = event.target;
+            btn.textContent = 'Copied';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        };
+
+        window.copyInviteUrl = async function (code) {
+            await navigator.clipboard.writeText(inviteUrl(code));
+        };
+
+        async function loadInvites() {
+            const list = document.getElementById('inviteList');
+            list.innerHTML = '<p class="muted">Loading...</p>';
+            try {
+                const res = await listInvites();
+                const invites = res.data.invites || [];
+                if (!invites.length) {
+                    list.innerHTML = '<p class="muted">No invites yet. Generate one above.</p>';
+                    return;
+                }
+                list.innerHTML = '';
+                invites.forEach((inv) => {
+                    const row = document.createElement('div');
+                    row.className = 'invite-row';
+                    const badge = inv.used
+                        ? '<span class="badge badge-used">Used</span>'
+                        : '<span class="badge badge-unused">Unused</span>';
+                    row.innerHTML =
+                        '<div>' +
+                        '<div class="invite-code">' + (inv.used ? '••••••••••••' : inv.code) + '</div>' +
+                        '<div class="muted">' + (inv.used ? ('Used by ' + (inv.usedBy || '?')) : 'Waiting') + '</div>' +
+                        '</div>' +
+                        '<div class="invite-actions">' + badge +
+                        (inv.used ? '' : '<button class="btn btn-secondary btn-small" onclick="copyInviteUrl(\'' + inv.code + '\')">Copy</button>') +
+                        '</div>';
+                    list.appendChild(row);
+                });
+            } catch (e) {
+                if (e.code === 'functions/permission-denied') {
+                    list.innerHTML = '<p class="muted">Not allowed.</p>';
+                } else {
+                    list.innerHTML = '<p class="muted">Failed to load.</p>';
+                }
+            }
+        }
+
+        window.runBackfill = async function () {
+            try {
+                const res = await backfill();
+                showMessage('Done: ' + (res.data.updated || 0) + ' problems tagged.', 'success', 'consoleMsg');
+            } catch (e) {
+                showMessage(e.message || 'Backfill failed', 'error', 'consoleMsg');
+            }
+        };
     </script>
 </body>
 </html>
