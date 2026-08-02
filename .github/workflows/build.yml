@@ -130,6 +130,7 @@ jobs:
 
       - name: Zip web build
         run: |
+          mkdir -p releases
           cd build/web
           zip -r ../../releases/Task-Tracker-v${{ steps.version.outputs.version }}-web.zip .
 
