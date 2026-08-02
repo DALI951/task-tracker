@@ -257,3 +257,45 @@ exports.onProblemCreated = functions.firestore
       functions.logger.warn('Failed to tag problem managerEmail', e);
     }
   });
+
+// One-time backfill: tags legacy problems (created before the managerEmail
+// trigger existed) using the employee directory. Call it once after deploy.
+exports.backfillProblemManagers = functions.https.onCall(async (_data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be signed in');
+  }
+  if (!(await isManager(context.auth.uid))) {
+    throw new functions.https.HttpsError('permission-denied', 'Only managers can run this');
+  }
+
+  try {
+    const problems = await db.collection('problems').where('managerEmail', '==', null).get();
+    let updated = 0;
+    let batch = db.batch();
+    let pending = 0;
+    for (const doc of problems.docs) {
+      const reportedBy = doc.data().reportedBy;
+      if (!reportedBy) continue;
+
+      const empDoc = await db.doc(`employees/${reportedBy}`).get();
+      if (!empDoc.exists) continue;
+
+      const managerEmail = empDoc.data().createdBy;
+      if (!managerEmail) continue;
+
+      batch.update(doc.ref, { managerEmail });
+      updated++;
+      pending++;
+      if (pending >= 400) {
+        await batch.commit();
+        batch = db.batch();
+        pending = 0;
+      }
+    }
+    if (pending > 0) await batch.commit();
+    return { updated };
+  } catch (e) {
+    functions.logger.warn('backfillProblemManagers failed', e);
+    throw new functions.https.HttpsError('internal', e.message);
+  }
+});

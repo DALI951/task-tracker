@@ -80,10 +80,21 @@ service cloud.firestore {
     // ─── Problems ─────────────────────────────────────────────
 
     match /problems/{id} {
-      allow create: if isAuth();
-      allow read: if isAuth();
-      allow update: if isAuth() && isManager(request.auth.uid);
-      allow delete: if isAuth() && isManager(request.auth.uid);
+      // Clients create problems; managerEmail is stamped by a Cloud
+      // Function trigger so it can't be spoofed from the client.
+      allow create: if isAuth() && !('managerEmail' in request.resource.data);
+
+      // Managers see problems reported by their own employees. Legacy
+      // documents without a managerEmail stay visible to all managers
+      // until a one-time backfill tags them.
+      allow read: if isAuth() && (resource.data.reportedBy == userEmail()
+          || (isManager(request.auth.uid)
+              && (resource.data.managerEmail == userEmail()
+                  || resource.data.managerEmail == null)));
+
+      allow update, delete: if isAuth() && isManager(request.auth.uid)
+          && (resource.data.managerEmail == userEmail()
+              || resource.data.managerEmail == null);
     }
 
     // ─── Notifications ────────────────────────────────────────

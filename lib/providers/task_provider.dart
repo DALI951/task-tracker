@@ -192,7 +192,8 @@ class TaskProvider extends ChangeNotifier {
 
   void listenToProblems() {
     _problemSub?.cancel();
-    _problemSub = _firestore.problemsStream.listen(
+    final email = AuthService().currentUser?.email ?? '';
+    _problemSub = _firestore.problemsStream(email).listen(
       (snapshot) {
         _problems = snapshot.docs.map((doc) {
           return Problem.fromMap(doc.data() as Map<String, dynamic>, doc.id);

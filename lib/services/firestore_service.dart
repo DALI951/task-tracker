@@ -131,7 +131,10 @@ class FirestoreService {
     await _problemsRef.doc(id).update(data);
   }
 
-  Stream<QuerySnapshot> get problemsStream {
-    return _problemsRef.orderBy('createdAt', descending: true).snapshots();
+  Stream<QuerySnapshot> problemsStream(String managerEmail) {
+    return _problemsRef
+        .where('managerEmail', isEqualTo: managerEmail)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
   }
 }
