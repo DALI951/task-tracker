@@ -253,9 +253,37 @@ class _PresetManagerState extends State<_PresetManager> {
 
   @override
   Widget build(BuildContext context) {
-    final presets = context.watch<TaskProvider>().presets;
+    final provider = context.watch<TaskProvider>();
+    final presets = provider.presets;
+    final error = provider.error;
     return Column(
       children: [
+        if (error != null)
+          Container(
+            margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onErrorContainer),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    error,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ...presets.map((p) => ListTile(
               title: Text(p.name),
               subtitle: p.defaultDescription != null
