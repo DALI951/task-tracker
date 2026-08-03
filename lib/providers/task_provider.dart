@@ -190,8 +190,10 @@ class TaskProvider extends ChangeNotifier {
     );
   }
 
-  void listenToProblems() {
+  void listenToProblems({bool isManager = true}) {
     _problemSub?.cancel();
+    // Employees only send problems — they never read them.
+    if (!isManager) return;
     final email = FirebaseAuth.instance.currentUser?.email ?? '';
     _problemSub = _firestore.problemsStream(email).listen(
       (snapshot) {

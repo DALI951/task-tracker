@@ -56,7 +56,10 @@ class _ProblemsScreenState extends State<ProblemsScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                context.read<TaskProvider>().listenToProblems();
+                context.read<TaskProvider>().listenToProblems(
+                  isManager:
+                      context.read<SettingsService>().currentRole == 'manager',
+                );
               },
               child: problems.isEmpty
                   ? ListView(

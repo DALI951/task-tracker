@@ -44,7 +44,9 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TaskProvider>().listenToAllTasks();
-      context.read<TaskProvider>().listenToProblems();
+      context.read<TaskProvider>().listenToProblems(
+        isManager: context.read<SettingsService>().currentRole == 'manager',
+      );
       final us = UpdateService();
       us.isOnHomeScreen = true;
       us.setHomeContext(context);

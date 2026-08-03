@@ -7,7 +7,7 @@ Single unified Flutter app with role-based UI:
 
 ## Backend status (2026-08-02)
 
-- The project is on Firebase's free **Spark** plan. **Cloud Functions and Cloud Storage cannot be deployed** (both require the paid Blaze plan; storage enforcement began Feb 2026). Firestore rules ARE deployed (user ran `firebase deploy --only firestore`).
+- The project is on Firebase's free **Spark** plan. **Cloud Functions and Cloud Storage cannot be deployed** (both require the paid Blaze plan; storage enforcement began Feb 2026). Firestore rules + composite indexes ARE deployed (agent runs `firebase deploy --only firestore` after each rules/indexes change, v0.4.4+).
 - **Interim (v0.4.1):** employee management is client-side (below). Photos are inline base64. FCM device push is OFF until a backend exists; the in-app notification list still works.
 - **Planned PHP backend (parked):** when the user provides server access (domain + FTP + owner email), build a PHP backend (`server/`) on their own server (powerpme.com, Apache + PHP 8.5.6 + curl) to replace the Cloud Functions and Firebase Storage: employee Auth management, one-time manager invites, FCM push, and photo uploads. App gets an HTTP API client pointed at the domain; released as v0.5.0. **No MySQL needed** — invites can live in Firestore. This is how the app is expected to evolve; nothing PHP has been built yet.
 
@@ -51,7 +51,7 @@ Single unified Flutter app with role-based UI:
 |---|---|---|---|
 | `users/{uid}` | owner, managers, or `role == 'manager'` docs | owner | Role storage (`manager` / `employee`); employee self-writes on creation |
 | `tasks/{id}` | manager + assigned employee | manager | Employees can update status/photo |
-| `problems/{id}` | reporter or owning manager (legacy `managerEmail == null` visible to all managers) | any auth'd user create (no `managerEmail`); manager update | `managerEmail` tagging was server-side (undeployed) — pending PHP/cron |
+| `problems/{id}` | managers only (employees are send-only) | any auth'd user create (no `managerEmail`); manager update | `managerEmail` tagging was server-side (undeployed) — pending PHP/cron |
 | `employees/{email}` | manager only (createdBy) or **the employee themselves** (interim delete check) | manager only | Employee directory; carries `authUid` |
 | `preset_tasks/{id}` | any auth'd user | manager only | Task templates |
 | `preset_items/{id}` | any auth'd user | manager only | Item templates |
@@ -81,7 +81,7 @@ Single unified Flutter app with role-based UI:
 | `lib/services/storage_service.dart` | Photo upload (interim base64) |
 | `functions/index.js` | Reference Cloud Functions implementation — NOT deployed, NOT used by the client |
 | `web_admin/index.html` | Invite page — dormant until the PHP admin site replaces it |
-| `firestore.indexes.json` | Composite indexes (presets, preset items, pending review, notifications, problems) — requires `firebase deploy --only firestore` |
+| `firestore.indexes.json` | Composite indexes (presets, preset items, pending review, notifications) — deployed via `firebase deploy --only firestore` |
 | `windows/installer/task-tracker-setup.iss` | Inno Setup installer script |
 
 ### App Icon
@@ -157,4 +157,4 @@ flutter build windows --release
 - Legacy employees created by the old `web_admin` have `createdBy: 'web_admin'` and are treated as modifiable by any manager (ownership fallback).
 - **Manager APK** exceeds GitHub's recommended 50MB — works fine but shows a warning.
 - **APK install** requires "Install Unknown Apps" permission on Android (granted once by user).
-- **Re-run `firebase deploy --only firestore`** to activate the v0.4.1 rules (employees self-read) and create the composite indexes from `firestore.indexes.json` — until then, presets/preset-items/notifications/pending-review lists may not update in real time.
+- **Firestore rules + composite indexes are deployed by the agent** (v0.4.4+): after any `firestore.rules`/`firestore.indexes.json` change, run `firebase deploy --only firestore` and verify "Deploy complete!". The project previously had **zero composite indexes** — presets/preset-items/notifications/pending-review lists were silently broken until the v0.4.4 deploy created them.

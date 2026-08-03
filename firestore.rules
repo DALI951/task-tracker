@@ -88,13 +88,10 @@ service cloud.firestore {
       // Function trigger so it can't be spoofed from the client.
       allow create: if isAuth() && !('managerEmail' in request.resource.data);
 
-      // Managers see problems reported by their own employees. Legacy
-      // documents without a managerEmail stay visible to all managers
-      // until a one-time backfill tags them.
-      allow read: if isAuth() && (resource.data.reportedBy == userEmail()
-          || (isManager(request.auth.uid)
-              && (resource.data.managerEmail == userEmail()
-                  || resource.data.managerEmail == null)));
+      // Employees only send problems — they never read them. Managers see
+      // all problems (legacy documents without managerEmail stay visible
+      // until a backfill tags them).
+      allow read: if isAuth() && isManager(request.auth.uid);
 
       allow update, delete: if isAuth() && isManager(request.auth.uid)
           && (resource.data.managerEmail == userEmail()
