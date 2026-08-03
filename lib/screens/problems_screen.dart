@@ -7,6 +7,7 @@ import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/storage_service.dart';
+import 'package:task_tracker/utils/error_handler.dart';
 
 class ProblemsScreen extends StatefulWidget {
   const ProblemsScreen({super.key});
@@ -300,10 +301,21 @@ class _ProblemCard extends StatelessWidget {
                     customer: null,
                     carOrThing: problem.carOrThing,
                   );
-                  if (newTaskId != null) {
-                    await provider.resolveProblem(problem.id, newTaskId);
-                    if (ctx.mounted) Navigator.pop(ctx);
+                  if (newTaskId == null) {
+                    if (ctx.mounted) {
+                      toast(ctx, provider.error ?? 'Failed to create task',
+                          error: true);
+                    }
+                    return;
                   }
+                  final resolved =
+                      await provider.resolveProblem(problem.id, newTaskId);
+                  if (!resolved && ctx.mounted) {
+                    toast(ctx,
+                        provider.error ?? 'Failed to update the problem',
+                        error: true);
+                  }
+                  if (ctx.mounted) Navigator.pop(ctx);
                 },
                 child: Text(context.read<SettingsService>().t('create')),
               ),

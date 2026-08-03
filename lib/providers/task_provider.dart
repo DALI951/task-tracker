@@ -648,9 +648,15 @@ class TaskProvider extends ChangeNotifier {
         'status': 'resolved',
         'convertedToTaskId': taskId,
       });
-      final problem = _problems.where((p) => p.id == problemId).firstOrNull;
-      if (problem != null && problem.reportedBy.isNotEmpty) {
-        _notif.send(
+    } catch (e) {
+      _error = friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+    final problem = _problems.where((p) => p.id == problemId).firstOrNull;
+    if (problem != null && problem.reportedBy.isNotEmpty) {
+      try {
+        await _notif.send(
           recipientEmail: problem.reportedBy,
           type: 'problem_converted',
           title: _t('notify_problem_resolved'),
@@ -658,13 +664,9 @@ class TaskProvider extends ChangeNotifier {
           relatedId: taskId,
           senderName: '',
         );
-      }
-      return true;
-    } catch (e) {
-      _error = friendlyError(e);
-      notifyListeners();
-      return false;
+      } catch (_) {}
     }
+    return true;
   }
 
   Future<bool> assignProblem(String problemId, String taskId) async {
@@ -673,9 +675,15 @@ class TaskProvider extends ChangeNotifier {
         'status': 'assigned',
         'convertedToTaskId': taskId,
       });
-      final problem = _problems.where((p) => p.id == problemId).firstOrNull;
-      if (problem != null && problem.reportedBy.isNotEmpty) {
-        _notif.send(
+    } catch (e) {
+      _error = friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+    final problem = _problems.where((p) => p.id == problemId).firstOrNull;
+    if (problem != null && problem.reportedBy.isNotEmpty) {
+      try {
+        await _notif.send(
           recipientEmail: problem.reportedBy,
           type: 'problem_converted',
           title: _t('notify_problem_converted'),
@@ -683,13 +691,9 @@ class TaskProvider extends ChangeNotifier {
           relatedId: taskId,
           senderName: '',
         );
-      }
-      return true;
-    } catch (e) {
-      _error = friendlyError(e);
-      notifyListeners();
-      return false;
+      } catch (_) {}
     }
+    return true;
   }
 
   Future<void> exportToClipboard() async {
