@@ -81,6 +81,7 @@ Single unified Flutter app with role-based UI:
 | `lib/services/storage_service.dart` | Photo upload (interim base64) |
 | `functions/index.js` | Reference Cloud Functions implementation — NOT deployed, NOT used by the client |
 | `web_admin/index.html` | Invite page — dormant until the PHP admin site replaces it |
+| `firestore.indexes.json` | Composite indexes (presets, preset items, pending review, notifications, problems) — requires `firebase deploy --only firestore` |
 | `windows/installer/task-tracker-setup.iss` | Inno Setup installer script |
 
 ### App Icon
@@ -156,4 +157,4 @@ flutter build windows --release
 - Legacy employees created by the old `web_admin` have `createdBy: 'web_admin'` and are treated as modifiable by any manager (ownership fallback).
 - **Manager APK** exceeds GitHub's recommended 50MB — works fine but shows a warning.
 - **APK install** requires "Install Unknown Apps" permission on Android (granted once by user).
-- After the next `firestore.rules` change, re-run `firebase deploy --only firestore` (currently the rules include the employees self-read rule).
+- **Re-run `firebase deploy --only firestore`** to activate the v0.4.1 rules (employees self-read) and create the composite indexes from `firestore.indexes.json` — until then, presets/preset-items/notifications/pending-review lists may not update in real time.
