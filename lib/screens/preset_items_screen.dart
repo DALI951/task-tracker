@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/utils/error_handler.dart';
 
 class PresetItemsScreen extends StatefulWidget {
   const PresetItemsScreen({super.key});
@@ -40,12 +41,18 @@ class _PresetItemsScreenState extends State<PresetItemsScreen> {
             child: Text(context.read<SettingsService>().t('cancel')),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (_ctrl.text.trim().isEmpty) return;
               final email = FirebaseAuth.instance.currentUser?.email ?? '';
-              context
+              final ok = await context
                   .read<TaskProvider>()
                   .addPresetItem(_ctrl.text.trim(), email);
+              if (!ctx.mounted) return;
+              if (!ok) {
+                toast(ctx, 'Failed to add item', error: true);
+                return;
+              }
+              toast(ctx, 'Item added');
               _ctrl.clear();
               Navigator.pop(ctx);
             },
@@ -87,8 +94,15 @@ class _PresetItemsScreenState extends State<PresetItemsScreen> {
                   title: Text(item.name),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    onPressed: () =>
-                        context.read<TaskProvider>().deletePresetItem(item.id),
+                    onPressed: () async {
+                      final ok = await context
+                          .read<TaskProvider>()
+                          .deletePresetItem(item.id);
+                      if (!mounted) return;
+                      toast(context,
+                          ok ? 'Item deleted' : 'Failed to delete item',
+                          error: !ok);
+                    },
                   ),
                 );
               },

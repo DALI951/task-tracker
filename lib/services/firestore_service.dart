@@ -132,8 +132,12 @@ class FirestoreService {
   }
 
   Stream<QuerySnapshot> problemsStream(String managerEmail) {
+    // Interim: show every problem the rules allow (managers: all + own,
+    // employees: their own reported). The per-manager filter paired with the
+    // never-deployed onProblemCreated tagger, so it hid all untagged problems.
+    // Re-scope to where('managerEmail', isEqualTo: managerEmail) once the PHP
+    // backend tags problems again.
     return _problemsRef
-        .where('managerEmail', isEqualTo: managerEmail)
         .orderBy('createdAt', descending: true)
         .snapshots();
   }

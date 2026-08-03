@@ -11,6 +11,7 @@ import 'package:task_tracker/screens/preset_items_screen.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
 import 'package:task_tracker/screens/whats_new_screen.dart';
+import 'package:task_tracker/utils/error_handler.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -263,8 +264,15 @@ class _PresetManagerState extends State<_PresetManager> {
                   : null,
               trailing: IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.red),
-                onPressed: () =>
-                    context.read<TaskProvider>().deletePreset(p.id),
+                onPressed: () async {
+                  final ok = await context
+                      .read<TaskProvider>()
+                      .deletePreset(p.id);
+                  if (!mounted) return;
+                  toast(context,
+                      ok ? 'Preset deleted' : 'Failed to delete preset',
+                      error: !ok);
+                },
               ),
             )),
         Padding(
@@ -340,19 +348,27 @@ class _AddPresetDialogState extends State<_AddPresetDialog> {
           child: Text(t('cancel')),
         ),
         ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             if (_nameCtrl.text.trim().isEmpty) return;
-            context.read<TaskProvider>().addPreset(PresetTask(
-                  id: DateTime.now()
-                      .millisecondsSinceEpoch
-                      .toString(),
-                  name: _nameCtrl.text.trim(),
-                  defaultDescription: _descCtrl.text.trim().isEmpty
-                      ? null
-                      : _descCtrl.text.trim(),
-                  requireCarOrThing: _reqCar,
-                  createdBy: FirebaseAuth.instance.currentUser?.email,
-                ));
+            final ok = await context.read<TaskProvider>().addPreset(
+                  PresetTask(
+                    id: DateTime.now()
+                        .millisecondsSinceEpoch
+                        .toString(),
+                    name: _nameCtrl.text.trim(),
+                    defaultDescription: _descCtrl.text.trim().isEmpty
+                        ? null
+                        : _descCtrl.text.trim(),
+                    requireCarOrThing: _reqCar,
+                    createdBy: FirebaseAuth.instance.currentUser?.email,
+                  ),
+                );
+            if (!context.mounted) return;
+            if (!ok) {
+              toast(context, 'Failed to create preset', error: true);
+              return;
+            }
+            toast(context, 'Preset created');
             Navigator.pop(context);
           },
           child: Text(t('save')),
