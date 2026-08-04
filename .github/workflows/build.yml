@@ -127,6 +127,7 @@ jobs:
         run: |
           mkdir -p build/web/admin
           cp web_admin/index.html build/web/admin/
+          cp web_admin/manager.html build/web/admin/
 
       - name: Zip web build
         run: |
