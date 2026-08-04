@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:task_tracker/models/app_notification.dart';
+import 'package:task_tracker/services/fcm_sender.dart';
 
 class NotificationService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -87,20 +90,61 @@ class NotificationService {
       'createdAt': FieldValue.serverTimestamp(),
       'relatedId': relatedId,
     });
+
+    unawaited(_sendFcmPush(
+      recipientEmail: recipientEmail,
+      title: title,
+      body: message,
+      data: {'type': type, if (relatedId != null) 'relatedId': relatedId},
+    ));
+  }
+
+  Future<void> _sendFcmPush({
+    required String recipientEmail,
+    required String title,
+    required String body,
+    Map<String, String>? data,
+  }) async {
+    try {
+      final usersSnap = await _db
+          .collection('users')
+          .where('email', isEqualTo: recipientEmail)
+          .limit(1)
+          .get();
+      if (usersSnap.docs.isEmpty) {
+        debugPrint('[Notif] No user doc found for $recipientEmail');
+        return;
+      }
+
+      final fcmToken = usersSnap.docs.first.data()['fcmToken'] as String?;
+      if (fcmToken == null || fcmToken.isEmpty) {
+        debugPrint('[Notif] No fcmToken for $recipientEmail');
+        return;
+      }
+
+      await FcmSender().sendPush(
+        token: fcmToken,
+        title: title,
+        body: body,
+        data: data,
+      );
+    } catch (e) {
+      debugPrint('[Notif] _sendFcmPush error: $e');
+    }
   }
 
   Stream<QuerySnapshot> streamForUser(String email) {
+    // Single-field filter only (no composite index needed); caller sorts by
+    // createdAt client-side.
     return _ref
         .where('recipientEmail', isEqualTo: email)
-        .orderBy('createdAt', descending: true)
-        .limit(100)
         .snapshots();
   }
 
   Stream<QuerySnapshot> unreadCountStream(String email) {
+    // Single-field filter only; caller filters by read client-side.
     return _ref
         .where('recipientEmail', isEqualTo: email)
-        .where('read', isEqualTo: false)
         .snapshots();
   }
 
@@ -111,11 +155,12 @@ class NotificationService {
   Future<void> markAllRead(String email) async {
     final snap = await _ref
         .where('recipientEmail', isEqualTo: email)
-        .where('read', isEqualTo: false)
         .get();
     final batch = _db.batch();
     for (final doc in snap.docs) {
-      batch.update(doc.reference, {'read': true});
+      if ((doc.data() as Map<String, dynamic>?)?['read'] != true) {
+        batch.update(doc.reference, {'read': true});
+      }
     }
     await batch.commit();
   }

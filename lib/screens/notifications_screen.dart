@@ -39,7 +39,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           StreamBuilder<QuerySnapshot>(
             stream: _service.unreadCountStream(email),
             builder: (context, snapshot) {
-              final count = snapshot.data?.docs.length ?? 0;
+              final count = snapshot.data?.docs
+                      .where((d) =>
+                          (d.data() as Map<String, dynamic>?)?['read'] != true)
+                      .length ??
+                  0;
               if (count == 0) return const SizedBox.shrink();
               return TextButton(
                 onPressed: () async {
@@ -74,14 +78,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             );
           }
 
-          final docs = snapshot.data!.docs;
+          final notifications = snapshot.data!.docs
+              .map((d) => AppNotification.fromMap(
+                  d.data() as Map<String, dynamic>, d.id))
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: docs.length,
+            itemCount: notifications.length,
             itemBuilder: (context, index) {
-              final doc = docs[index];
-              final n = AppNotification.fromMap(
-                  doc.data() as Map<String, dynamic>, doc.id);
+              final n = notifications[index];
               return _NotificationTile(
                 notification: n,
                 onTap: () async {

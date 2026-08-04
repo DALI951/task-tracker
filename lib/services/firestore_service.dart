@@ -68,9 +68,10 @@ class FirestoreService {
   }
 
   Stream<QuerySnapshot> pendingReviewStream(String createdBy) {
+    // Single-field filter only (no composite index needed). Caller filters by
+    // status client-side.
     return _tasksRef
         .where('createdBy', isEqualTo: createdBy)
-        .where('status', isEqualTo: 'pending_review')
         .snapshots();
   }
 
@@ -83,9 +84,9 @@ class FirestoreService {
   }
 
   Stream<QuerySnapshot> presetsStream(String createdBy) {
+    // Single-field filter only; caller sorts by name client-side.
     return _presetsRef
         .where('createdBy', isEqualTo: createdBy)
-        .orderBy('name')
         .snapshots();
   }
 
@@ -117,9 +118,9 @@ class FirestoreService {
   }
 
   Stream<QuerySnapshot> presetItemsStream(String createdBy) {
+    // Single-field filter only; caller sorts by name client-side.
     return _presetItemsRef
         .where('createdBy', isEqualTo: createdBy)
-        .orderBy('name')
         .snapshots();
   }
 

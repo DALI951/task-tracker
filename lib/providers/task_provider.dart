@@ -38,6 +38,9 @@ class TaskProvider extends ChangeNotifier {
   StreamSubscription? _problemSub;
   StreamSubscription? _employeeSub;
   StreamSubscription? _itemSub;
+  Timer? _restartTimer;
+  int _restartAttempts = 0;
+  static const int _maxRestartAttempts = 6;
 
   String _t(String key) => _settings?.t(key) ?? key;
 
@@ -60,6 +63,21 @@ class TaskProvider extends ChangeNotifier {
     _loading = value;
     notifyListeners();
   }
+
+  // If a real-time stream dies (network blip, missing index, transient
+  // rules error), re-subscribe after a short delay so the dashboard
+  // recovers by itself instead of showing stale data until refresh.
+  void _scheduleRestart(void Function() resubscribe) {
+    _restartAttempts += 1;
+    if (_restartAttempts > _maxRestartAttempts) return;
+    _restartTimer?.cancel();
+    _restartTimer = Timer(const Duration(seconds: 3), () {
+      if (FirebaseAuth.instance.currentUser == null) return;
+      resubscribe();
+    });
+  }
+
+  void _resetRestartBudget() => _restartAttempts = 0;
 
   List<AppTask> searchTasks(String query) {
     if (query.isEmpty) return _tasks;
@@ -88,6 +106,9 @@ class TaskProvider extends ChangeNotifier {
   }
 
   void stopListening() {
+    _restartTimer?.cancel();
+    _restartTimer = null;
+    _restartAttempts = 0;
     _taskSub?.cancel();
     _taskSub = null;
     _reviewSub?.cancel();
@@ -106,13 +127,15 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void listenToAllTasks() {
+  void listenToAllTasks({bool silent = false}) {
     _taskSub?.cancel();
-    _loading = true;
-    _connected = false;
-    _tasks = [];
-    _error = null;
-    notifyListeners();
+    if (!silent) {
+      _loading = true;
+      _connected = false;
+      _tasks = [];
+      _error = null;
+      notifyListeners();
+    }
     final email = FirebaseAuth.instance.currentUser?.email;
     if (email == null) {
       _loading = false;
@@ -127,6 +150,7 @@ class TaskProvider extends ChangeNotifier {
         }).toList());
         _loading = false;
         _connected = true;
+        _resetRestartBudget();
         notifyListeners();
       },
       onError: (e) {
@@ -134,6 +158,7 @@ class TaskProvider extends ChangeNotifier {
         _connected = false;
         _error = friendlyError(e);
         notifyListeners();
+        _scheduleRestart(() => listenToAllTasks(silent: true));
       },
     );
     _listenPresets(email);
@@ -141,13 +166,15 @@ class TaskProvider extends ChangeNotifier {
     _listenPresetItems(email);
   }
 
-  void listenToEmployeeTasks(String email) {
+  void listenToEmployeeTasks(String email, {bool silent = false}) {
     _taskSub?.cancel();
-    _loading = email.isNotEmpty;
-    _connected = false;
-    _tasks = [];
-    _error = null;
-    notifyListeners();
+    if (!silent) {
+      _loading = email.isNotEmpty;
+      _connected = false;
+      _tasks = [];
+      _error = null;
+      notifyListeners();
+    }
     if (email.isEmpty) {
       _loading = false;
       _error = 'No user email found';
@@ -161,6 +188,7 @@ class TaskProvider extends ChangeNotifier {
         }).toList());
         _loading = false;
         _connected = true;
+        _resetRestartBudget();
         notifyListeners();
       },
       onError: (e) {
@@ -168,6 +196,7 @@ class TaskProvider extends ChangeNotifier {
         _connected = false;
         _error = friendlyError(e);
         notifyListeners();
+        _scheduleRestart(() => listenToEmployeeTasks(email, silent: true));
       },
     );
   }
@@ -178,14 +207,19 @@ class TaskProvider extends ChangeNotifier {
     if (email == null) return;
     _reviewSub = _firestore.pendingReviewStream(email).listen(
       (snapshot) {
-        _pendingReview = snapshot.docs.map((doc) {
-          return AppTask.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-        }).toList();
+        _pendingReview = snapshot.docs
+            .where((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'pending_review')
+            .map((doc) {
+              return AppTask.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+            })
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
         notifyListeners();
       },
       onError: (e) {
         _error = friendlyError(e);
         notifyListeners();
+        _scheduleRestart(listenToPendingReview);
       },
     );
   }
@@ -200,11 +234,13 @@ class TaskProvider extends ChangeNotifier {
         _problems = snapshot.docs.map((doc) {
           return Problem.fromMap(doc.data() as Map<String, dynamic>, doc.id);
         }).toList();
+        _resetRestartBudget();
         notifyListeners();
       },
       onError: (e) {
         _error = friendlyError(e);
         notifyListeners();
+        _scheduleRestart(() => listenToProblems(isManager: isManager));
       },
     );
   }
@@ -214,12 +250,14 @@ class TaskProvider extends ChangeNotifier {
     _presetSub = _firestore.presetsStream(createdBy).listen((snapshot) {
       _presets = snapshot.docs.map((doc) {
         return PresetTask.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-      }).toList();
+      }).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       notifyListeners();
     },
     onError: (e) {
       _error = friendlyError(e);
       notifyListeners();
+      _scheduleRestart(() => _listenPresets(createdBy));
     });
   }
 
@@ -234,6 +272,7 @@ class TaskProvider extends ChangeNotifier {
     onError: (e) {
       _error = friendlyError(e);
       notifyListeners();
+      _scheduleRestart(() => _listenEmployees(createdBy));
     });
   }
 
@@ -242,12 +281,14 @@ class TaskProvider extends ChangeNotifier {
     _itemSub = _firestore.presetItemsStream(createdBy).listen((snapshot) {
       _presetItems = snapshot.docs.map((doc) {
         return PresetItem.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-      }).toList();
+      }).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       notifyListeners();
     },
     onError: (e) {
       _error = friendlyError(e);
       notifyListeners();
+      _scheduleRestart(() => _listenPresetItems(createdBy));
     });
   }
 
@@ -729,6 +770,8 @@ class TaskProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _restartTimer?.cancel();
+    _restartTimer = null;
     _taskSub?.cancel();
     _reviewSub?.cancel();
     _presetSub?.cancel();
