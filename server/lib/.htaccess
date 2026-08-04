@@ -1,0 +1,2 @@
+# Block direct web access to library files.
+Require all denied
