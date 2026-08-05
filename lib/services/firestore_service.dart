@@ -133,13 +133,21 @@ class FirestoreService {
   }
 
   Stream<QuerySnapshot> problemsStream(String managerEmail) {
-    // Interim: show every problem the rules allow (managers: all + own,
-    // employees: their own reported). The per-manager filter paired with the
-    // never-deployed onProblemCreated tagger, so it hid all untagged problems.
-    // Re-scope to where('managerEmail', isEqualTo: managerEmail) once the PHP
-    // backend tags problems again.
+    // Manager-scoped: each problem carries the managerEmail that receives it,
+    // and managers only see their own. The client stamps managerEmail at
+    // create (rules verify it), so this filter keeps managers isolated.
     return _problemsRef
+        .where('managerEmail', isEqualTo: managerEmail)
         .orderBy('createdAt', descending: true)
         .snapshots();
+  }
+
+  /// The manager email an employee reports problems to = the manager that
+  /// created their directory entry (employees/{email}.createdBy).
+  Future<String?> managerEmailForEmployee(String employeeEmail) async {
+    final doc = await _employeesRef.doc(employeeEmail).get();
+    if (!doc.exists) return null;
+    final data = doc.data() as Map<String, dynamic>?;
+    return data?['createdBy'] as String?;
   }
 }

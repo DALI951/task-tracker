@@ -88,11 +88,27 @@ class _AuthGateState extends State<AuthGate> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () {
-                        FirebaseAuth.instance.signOut();
-                      },
-                      child: Text(settings.t('sign_out')),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _resolvedRole = null;
+                              _loading = true;
+                            });
+                            _resolveRole(settings, user.uid, user.email ?? '');
+                          },
+                          child: const Text('Retry'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () {
+                            FirebaseAuth.instance.signOut();
+                          },
+                          child: Text(settings.t('sign_out')),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -116,26 +132,29 @@ class _AuthGateState extends State<AuthGate> {
     String? role = (cached != null && cached.isNotEmpty) ? cached : null;
 
     if (role == null) {
-      try {
-        role = await _userService
-            .getRole(uid)
-            .timeout(const Duration(seconds: 25));
-        if (role != null && role.isNotEmpty) {
-          await prefs.setString('role_$uid', role);
-        }
-      } catch (e) {
-        if (e is TimeoutException) {
-          try {
-            role = await _userService.getRole(uid).timeout(const Duration(seconds: 25));
-            if (role != null && role.isNotEmpty) {
-              await prefs.setString('role_$uid', role);
-            }
-          } catch (_) {
-            role = cached != null && cached.isNotEmpty ? cached : null;
+      // Try resolving the role up to 3 times on any error (timeouts, network
+      // hiccups, cold-start races), with a short gap between attempts, so a
+      // first-login role lookup survives a transient failure.
+      const delays = [Duration(milliseconds: 500), Duration(seconds: 1)];
+      for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+          role = await _userService
+              .getRole(uid)
+              .timeout(const Duration(seconds: 25));
+          if (role != null && role.isNotEmpty) {
+            await prefs.setString('role_$uid', role);
+            break;
           }
-        } else {
-          role = cached != null && cached.isNotEmpty ? cached : null;
+          role = null;
+        } catch (_) {
+          role = null;
         }
+        if (attempt < delays.length) {
+          await Future<void>.delayed(delays[attempt]);
+        }
+      }
+      if (role == null) {
+        role = cached != null && cached.isNotEmpty ? cached : null;
       }
     }
 

@@ -670,6 +670,21 @@ class TaskProvider extends ChangeNotifier {
     String? carOrThing,
   }) async {
     try {
+      final role = await _userService
+          .getRole(FirebaseAuth.instance.currentUser?.uid ?? '');
+      String? managerEmail;
+      if (role == 'manager') {
+        managerEmail = FirebaseAuth.instance.currentUser?.email;
+      } else {
+        managerEmail = await _firestore.managerEmailForEmployee(reportedBy);
+      }
+      if (managerEmail == null || managerEmail.isEmpty) {
+        _error = 'Could not determine your manager. Ensure your account is set up with a manager.';
+        _reportError = _error;
+        notifyListeners();
+        return false;
+      }
+
       String? photoUrl;
       if (photoBytes != null) {
         photoUrl = await _storage.uploadImage(
@@ -683,11 +698,13 @@ class TaskProvider extends ChangeNotifier {
         'description': description,
         'photoUrl': photoUrl,
         'carOrThing': carOrThing,
+        'managerEmail': managerEmail,
         'createdAt': DateTime.now(),
         'status': 'open',
         'convertedToTaskId': null,
       });
-      _notif.sendToManagers(
+      _notif.send(
+        recipientEmail: managerEmail,
         type: 'problem_reported',
         title: _t('notify_problem_reported'),
         message: _t('notif_problem_reported_msg').replaceAll('{name}', reporterName),

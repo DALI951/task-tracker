@@ -18,6 +18,12 @@ service cloud.firestore {
       return request.auth.token.email;
     }
 
+    function isEmployeeOf(managerEmail) {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/employees/$(userEmail())) &&
+        get(/databases/$(database)/documents/employees/$(userEmail())).data.createdBy == managerEmail;
+    }
+
     // ─── Users ────────────────────────────────────────────────
 
     match /users/{uid} {
@@ -84,18 +90,25 @@ service cloud.firestore {
     // ─── Problems ─────────────────────────────────────────────
 
     match /problems/{id} {
-      // Clients create problems; managerEmail is stamped by a Cloud
-      // Function trigger so it can't be spoofed from the client.
-      allow create: if isAuth() && !('managerEmail' in request.resource.data);
+      // Problems are tenant-scoped by managerEmail. An employee creates a
+      // problem stamped with the email of the manager who created their
+      // directory entry (verified here, so it can't be spoofed to another
+      // tenant); a manager can report problems to their own email.
+      allow create: if isAuth()
+        && request.resource.data.managerEmail is string
+        && request.resource.data.managerEmail != ''
+        && (
+          (isManager(request.auth.uid)
+            && request.resource.data.managerEmail == userEmail())
+          || isEmployeeOf(request.resource.data.managerEmail)
+        );
 
-      // Employees only send problems — they never read them. Managers see
-      // all problems (legacy documents without managerEmail stay visible
-      // until a backfill tags them).
-      allow read: if isAuth() && isManager(request.auth.uid);
+      // Managers only see problems tagged to their own email.
+      allow read: if isAuth() && isManager(request.auth.uid)
+        && resource.data.managerEmail == userEmail();
 
       allow update, delete: if isAuth() && isManager(request.auth.uid)
-          && (resource.data.managerEmail == userEmail()
-              || resource.data.managerEmail == null);
+        && resource.data.managerEmail == userEmail();
     }
 
     // ─── Notifications ────────────────────────────────────────

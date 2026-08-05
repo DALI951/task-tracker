@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:task_tracker/config/app_secret.dart';
 
 class StorageService {
   static const _uploadUrl =
@@ -16,7 +17,11 @@ class StorageService {
         final uri = Uri.parse(
             '$_uploadUrl?path=${Uri.encodeComponent(path)}');
         final resp = await http
-            .post(uri, body: bytes, headers: {'Content-Type': 'image/jpeg'})
+            .post(
+              uri,
+              body: bytes,
+              headers: {'Content-Type': 'image/jpeg', 'X-App-Secret': appSecret},
+            )
             .timeout(const Duration(seconds: 45));
         if (resp.statusCode == 200) {
           final data = json.decode(resp.body) as Map<String, dynamic>;
