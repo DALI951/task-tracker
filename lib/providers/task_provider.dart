@@ -9,8 +9,10 @@ import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/services/firestore_service.dart';
 import 'package:task_tracker/services/notification_service.dart';
+import 'package:task_tracker/services/photo_upload.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/storage_service.dart';
+import 'package:task_tracker/services/upload_job.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
@@ -355,29 +357,55 @@ class TaskProvider extends ChangeNotifier {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) { _error = 'Not signed in'; notifyListeners(); return false; }
-      final photoUrl = await _storage.uploadImage(
-        imageBytes,
-        'task_photos/$taskId/proof_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      );
-      await _firestore.updateTask(taskId, {
-        'status': 'completed',
-        'photoUrl': photoUrl,
-        'completedAt': DateTime.now(),
-        'approvedBy': user.email,
-        'rejectionReason': null,
-      });
-      _addHistory(taskId, 'approved', user.displayName ?? user.email ?? '');
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
-      if (task != null) {
+      if (task == null) { _error = 'Task not found'; notifyListeners(); return false; }
+      final actorName = user.displayName ?? user.email ?? '';
+
+      if (kIsWeb) {
+        final photoUrl = await _storage.uploadImage(
+          imageBytes,
+          'task_photos/$taskId/proof_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+        await _firestore.updateTask(taskId, {
+          'status': 'completed',
+          'photoUrl': photoUrl,
+          'completedAt': DateTime.now(),
+          'approvedBy': user.email,
+          'rejectionReason': null,
+        });
+        _addHistory(taskId, 'approved', actorName);
         _notif.send(
           recipientEmail: task.assignedToEmail,
           type: 'task_approved',
           title: _t('notify_task_approved'),
           message: '"${task.title}" ${_t('notif_task_approved_msg')}',
           relatedId: taskId,
-          senderName: await _userService.getDisplayName(user.email ?? ''),
+          senderName: actorName,
         );
+        return true;
       }
+
+      final now = DateTime.now();
+      final jobId = 'approve_${taskId}_${now.millisecondsSinceEpoch}';
+      final filePath = await PhotoUploadService.stagePhoto(imageBytes, jobId);
+      await PhotoUploadService().enqueue(UploadJob(
+        id: jobId,
+        type: UploadJobType.taskApprove,
+        filePath: filePath,
+        uploadPath:
+            'task_photos/$taskId/proof_${now.millisecondsSinceEpoch}.jpg',
+        notifType: 'task_approved',
+        notifTitle: _t('notify_task_approved'),
+        notifMessage: '"${task.title}" ${_t('notif_task_approved_msg')}',
+        recipientEmail: task.assignedToEmail,
+        senderName: actorName,
+        taskId: taskId,
+        taskTitle: task.title,
+        actorEmail: user.email,
+        actorName: actorName,
+        historyAction: 'approved',
+        historyBy: actorName,
+      ));
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -421,28 +449,56 @@ class TaskProvider extends ChangeNotifier {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) { _error = 'Not signed in'; notifyListeners(); return false; }
-      final photoUrl = await _storage.uploadImage(
-        imageBytes,
-        'task_photos/$taskId/proof_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      );
-      await _firestore.updateTask(taskId, {
-        'status': 'pending_review',
-        'photoUrl': photoUrl,
-        'completedAt': DateTime.now(),
-        'rejectionReason': null,
-      });
-      _addHistory(taskId, 'submitted_proof', user.displayName ?? user.email ?? '');
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
-      if (task != null) {
-      _notif.send(
-        recipientEmail: task.createdBy,
-        type: 'task_submitted',
-        title: _t('notify_task_submitted'),
-        message: '${_t('notif_task_submitted_msg')} "${task.title}"'.replaceAll('{name}', await _userService.getDisplayName(user.email ?? '')),
-        relatedId: taskId,
-        senderName: await _userService.getDisplayName(user.email ?? ''),
-      );
+      if (task == null) { _error = 'Task not found'; notifyListeners(); return false; }
+      final actorName = user.displayName ?? user.email ?? '';
+
+      if (kIsWeb) {
+        final photoUrl = await _storage.uploadImage(
+          imageBytes,
+          'task_photos/$taskId/proof_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+        await _firestore.updateTask(taskId, {
+          'status': 'pending_review',
+          'photoUrl': photoUrl,
+          'completedAt': DateTime.now(),
+          'rejectionReason': null,
+        });
+        _addHistory(taskId, 'submitted_proof', actorName);
+        _notif.send(
+          recipientEmail: task.createdBy,
+          type: 'task_submitted',
+          title: _t('notify_task_submitted'),
+          message: '${_t('notif_task_submitted_msg')} "${task.title}"'
+              .replaceAll('{name}', actorName),
+          relatedId: taskId,
+          senderName: actorName,
+        );
+        return true;
       }
+
+      final now = DateTime.now();
+      final jobId = 'submit_${taskId}_${now.millisecondsSinceEpoch}';
+      final filePath = await PhotoUploadService.stagePhoto(imageBytes, jobId);
+      await PhotoUploadService().enqueue(UploadJob(
+        id: jobId,
+        type: UploadJobType.taskSubmit,
+        filePath: filePath,
+        uploadPath:
+            'task_photos/$taskId/proof_${now.millisecondsSinceEpoch}.jpg',
+        notifType: 'task_submitted',
+        notifTitle: _t('notify_task_submitted'),
+        notifMessage: '${_t('notif_task_submitted_msg')} "${task.title}"'
+            .replaceAll('{name}', actorName),
+        recipientEmail: task.createdBy,
+        senderName: actorName,
+        taskId: taskId,
+        taskTitle: task.title,
+        actorEmail: user.email,
+        actorName: actorName,
+        historyAction: 'submitted_proof',
+        historyBy: actorName,
+      ));
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -654,7 +710,46 @@ class TaskProvider extends ChangeNotifier {
     String? carOrThing,
   }) async {
     try {
+      final role =
+          await _userService.getRole(FirebaseAuth.instance.currentUser?.uid ?? '');
+      String? managerEmail;
+      if (role == 'manager') {
+        managerEmail = FirebaseAuth.instance.currentUser?.email;
+      } else {
+        managerEmail = await _firestore.managerEmailForEmployee(reportedBy);
+      }
+      if (managerEmail == null || managerEmail.isEmpty) {
+        _error = 'Could not determine your manager. Ensure your employee record exists with a manager assigned.';
+        notifyListeners();
+        return false;
+      }
+
       String? photoUrl;
+      if (photoBytes != null && !kIsWeb) {
+        final now = DateTime.now();
+        final jobId = 'problem_${reportedBy}_${now.millisecondsSinceEpoch}';
+        final filePath = await PhotoUploadService.stagePhoto(photoBytes, jobId);
+        await PhotoUploadService().enqueue(UploadJob(
+          id: jobId,
+          type: UploadJobType.problemReport,
+          filePath: filePath,
+          uploadPath:
+              'problem_photos/${reportedBy}_${now.millisecondsSinceEpoch}.jpg',
+          notifType: 'problem_reported',
+          notifTitle: _t('notify_problem_reported'),
+          notifMessage: _t('notif_problem_reported_msg')
+              .replaceAll('{name}', reporterName),
+          recipientEmail: managerEmail,
+          senderName: reporterName,
+          reporterEmail: reportedBy,
+          reporterName: reporterName,
+          description: description,
+          carOrThing: carOrThing,
+          managerEmail: managerEmail,
+        ));
+        return true;
+      }
+
       if (photoBytes != null) {
         photoUrl = await _storage.uploadImage(
           photoBytes,
@@ -670,11 +765,14 @@ class TaskProvider extends ChangeNotifier {
         'createdAt': DateTime.now(),
         'status': 'open',
         'convertedToTaskId': null,
+        'managerEmail': managerEmail,
       });
-      _notif.sendToManagers(
+      await _notif.send(
+        recipientEmail: managerEmail,
         type: 'problem_reported',
         title: _t('notify_problem_reported'),
-        message: _t('notif_problem_reported_msg').replaceAll('{name}', reporterName),
+        message: _t('notif_problem_reported_msg')
+            .replaceAll('{name}', reporterName),
         senderName: reporterName,
       );
       return true;
