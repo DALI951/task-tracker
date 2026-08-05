@@ -231,6 +231,8 @@ class TaskProvider extends ChangeNotifier {
     // Employees only send problems — they never read them.
     if (!isManager) return;
     final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    _problems = []; // Clear local cache immediately
+    notifyListeners();
     _problemSub = _firestore.problemsStream(email).listen(
       (snapshot) {
         _problems = snapshot.docs.map((doc) {
