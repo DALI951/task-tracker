@@ -52,8 +52,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
           ? ImageSource.gallery
           : ImageSource.camera,
-      maxWidth: 1024,
-      maxHeight: 1024,
+      maxWidth: kIsWeb ? 1024 : 2048,
+      maxHeight: kIsWeb ? 1024 : 2048,
     );
     if (picked == null) return;
 
@@ -86,8 +86,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
           ? ImageSource.gallery
           : ImageSource.camera,
-      maxWidth: 1024,
-      maxHeight: 1024,
+      maxWidth: kIsWeb ? 1024 : 2048,
+      maxHeight: kIsWeb ? 1024 : 2048,
     );
     if (picked == null) return;
 

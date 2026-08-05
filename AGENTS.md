@@ -5,11 +5,12 @@ Single unified Flutter app with role-based UI:
 - **Manager** — create/manage employees, assign tasks, review completions, view reported problems
 - **Employee** — view assigned tasks, start/complete with photo proof, report problems
 
-## Backend status (2026-08-02)
+## Backend status (2026-08-05)
 
 - The project is on Firebase's free **Spark** plan. **Cloud Functions and Cloud Storage cannot be deployed** (both require the paid Blaze plan; storage enforcement began Feb 2026). Firestore rules + composite indexes ARE deployed (agent runs `firebase deploy --only firestore` after each rules/indexes change, v0.4.4+).
-- **Interim (v0.4.1):** employee management is client-side (below). Photos are inline base64. FCM device push is OFF until a backend exists; the in-app notification list still works.
-- **Planned PHP backend (parked):** when the user provides server access (domain + FTP + owner email), build a PHP backend (`server/`) on their own server (powerpme.com, Apache + PHP 8.5.6 + curl) to replace the Cloud Functions and Firebase Storage: employee Auth management, one-time manager invites, FCM push, and photo uploads. App gets an HTTP API client pointed at the domain; released as v0.5.0. **No MySQL needed** — invites can live in Firestore. This is how the app is expected to evolve; nothing PHP has been built yet.
+- **PHP backend is LIVE** on the user's own server (`modali.powerpme.com`, Apache + PHP 8.5.6, SFTP-only access — no cPanel/cron, no HTTPS): `server/` maps to `/public_html/tasktracker/`. Endpoints: `api/create-manager.php` (manager accounts), `api/send-push.php` (FCM v1 push relay), `api/upload-photo.php` (photo uploads → `/public_html/uploads/`, 0777 dirs created via SFTP; PHP runs as `www-data`).
+- **Photos:** native apps upload full-quality photos (2048px) to the server and store the returned URL on the document (`isRemotePhoto`). Web keeps inline base64 (browser blocks HTTP calls from the HTTPS GitHub Pages build — mixed content; server has no valid HTTPS cert).
+- **FCM push:** works for actions initiated from the **phone app** (any direction). Actions initiated from the **web build** write the notification doc but the push relay call is blocked by mixed content — in-app notification list still shows it. Web push registration is intentionally not implemented. If the server ever gets a trusted HTTPS cert, the relay URLs (`fcm_sender.dart`, `storage_service.dart`) can flip to `https://` and web sends/uploads start working.
 
 ---
 
@@ -55,7 +56,7 @@ Single unified Flutter app with role-based UI:
 | `employees/{email}` | manager only (createdBy) or **the employee themselves** (interim delete check) | manager only | Employee directory; carries `authUid` |
 | `preset_tasks/{id}` | any auth'd user | manager only | Task templates |
 | `preset_items/{id}` | any auth'd user | manager only | Item templates |
-| `notifications/{id}` | recipient | sender | Written by client with `sent:false`; FCM send pending backend |
+| `notifications/{id}` | recipient | sender | Written by client; native app relays the FCM push via the PHP server |
 
 ### Key Files
 
@@ -78,7 +79,7 @@ Single unified Flutter app with role-based UI:
 | `lib/services/auth_gate.dart` | Role resolution + interim deleted-employee block |
 | `lib/services/settings_service.dart` | Theme/language prefs + i18n |
 | `lib/services/user_service.dart` | Role management (getRole) |
-| `lib/services/storage_service.dart` | Photo upload (interim base64) |
+| `lib/services/storage_service.dart` | Photo upload (native → PHP server URL; web → base64) |
 | `functions/index.js` | Reference Cloud Functions implementation — NOT deployed, NOT used by the client |
 | `server/` | PHP admin backend (manager account creation + FCM push) — see `server/` for details |
 | `firestore.indexes.json` | Composite indexes (presets, preset items, pending review, notifications) — deployed via `firebase deploy --only firestore` |
@@ -145,12 +146,13 @@ flutter build windows --release
 ## Account Creation
 
 - **Employees (interim):** managers use the in-app **Manage Employees** screen. Client-side create with a brief session swap (manager password asked once per session, held in memory via `ManagerSession`); reset via password-reset email; delete removes the directory doc and the auth gate blocks that account.
-- **Managers (parked):** one-time invite links from a PHP admin site on the user's server (domain + FTP pending). Until then, managers can only be created in the Firebase Console.
+- **Managers:** created via the PHP admin site (live at `http://modali.powerpme.com/tasktracker/`).
 - `moderator.html` self-signup was removed (any visitor could mint a manager account).
 
 ## Known Issues
-- **FCM device push is OFF** until the PHP backend ships (no functions/Storage on Spark). In-app notifications list still works.
-- **Photos are base64** (interim) — watch the 1 MiB document limit. Legacy remote URLs still render.
+- **Web-initiated pushes are blocked (mixed content):** the HTTPS web build can't call the `http://` server, so actions done in the web app (create task, status change) don't trigger device pushes — the notification doc is still written and shows in-app. Phone-app-initiated actions push fine in all directions. Fixed automatically if the server ever gets a trusted HTTPS cert.
+- **Web photos are base64 (interim)** — watch the 1 MiB document limit on web. Native apps upload full-res photos to the server instead.
+- **Delete does not remove the Firebase Auth account** (client SDK can't) — the account is blocked via the directory check instead. Full removal with the PHP backend.
 - **Delete does not remove the Firebase Auth account** (client SDK can't) — the account is blocked via the directory check instead. Full removal with the PHP backend.
 - **Email-already-exists** on create only offers a reset email (full conflict tools pending backend).
 - Legacy problems (created before `managerEmail` tagging) are visible to all managers until a backfill runs (pending backend/cron).
