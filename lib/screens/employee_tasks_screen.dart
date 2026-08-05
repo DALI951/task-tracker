@@ -114,7 +114,7 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
           const UpdateBanner(),
           if (provider.loading && provider.error == null)
             const LinearProgressIndicator(),
-          if (provider.error != null)
+          if (provider.employeeTasksError != null)
             Padding(
               padding: const EdgeInsets.all(12),
               child: Container(
@@ -127,12 +127,12 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(provider.error!,
+                      child: Text(provider.employeeTasksError!,
                           style: TextStyle(color: Brand.problem)),
                     ),
                     TextButton(
                       onPressed: () {
-                        provider.clearError();
+                        provider.clearEmployeeTasksError();
                         final email = AuthService().currentUser?.email ?? '';
                         provider.listenToEmployeeTasks(email);
                       },
@@ -166,11 +166,11 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                           style: TextStyle(
                               fontSize: 16,
                               color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                      if (provider.error != null) ...[
+                      if (provider.employeeTasksError != null) ...[
                         const SizedBox(height: 8),
                         ElevatedButton.icon(
                           onPressed: () {
-                            provider.clearError();
+                            provider.clearEmployeeTasksError();
                             final email =
                                 AuthService().currentUser?.email ?? '';
                             provider.listenToEmployeeTasks(email);

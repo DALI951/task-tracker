@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -118,12 +119,23 @@ class _AuthGateState extends State<AuthGate> {
       try {
         role = await _userService
             .getRole(uid)
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 25));
         if (role != null && role.isNotEmpty) {
           await prefs.setString('role_$uid', role);
         }
-      } catch (_) {
-        role = cached != null && cached.isNotEmpty ? cached : null;
+      } catch (e) {
+        if (e is TimeoutException) {
+          try {
+            role = await _userService.getRole(uid).timeout(const Duration(seconds: 25));
+            if (role != null && role.isNotEmpty) {
+              await prefs.setString('role_$uid', role);
+            }
+          } catch (_) {
+            role = cached != null && cached.isNotEmpty ? cached : null;
+          }
+        } else {
+          role = cached != null && cached.isNotEmpty ? cached : null;
+        }
       }
     }
 

@@ -32,6 +32,10 @@ class TaskProvider extends ChangeNotifier {
   bool _loading = true;
   bool _connected = false;
   String? _error;
+  String? _employeeTasksError;
+  String? _problemsError;
+  String? _presetsError;
+  String? _reportError;
   StreamSubscription? _taskSub;
   StreamSubscription? _reviewSub;
   StreamSubscription? _presetSub;
@@ -53,11 +57,20 @@ class TaskProvider extends ChangeNotifier {
   bool get loading => _loading;
   bool get connected => _connected;
   String? get error => _error;
+  String? get employeeTasksError => _employeeTasksError;
+  String? get problemsError => _problemsError;
+  String? get presetsError => _presetsError;
+  String? get reportError => _reportError;
 
   void clearError() {
     _error = null;
     notifyListeners();
   }
+
+  void clearEmployeeTasksError() { _employeeTasksError = null; notifyListeners(); }
+  void clearProblemsError() { _problemsError = null; notifyListeners(); }
+  void clearPresetsError() { _presetsError = null; notifyListeners(); }
+  void clearReportError() { _reportError = null; notifyListeners(); }
 
   void setLoading(bool value) {
     _loading = value;
@@ -195,6 +208,7 @@ class TaskProvider extends ChangeNotifier {
         _loading = false;
         _connected = false;
         _error = friendlyError(e);
+        _employeeTasksError = friendlyError(e);
         notifyListeners();
         _scheduleRestart(() => listenToEmployeeTasks(email, silent: true));
       },
@@ -239,6 +253,7 @@ class TaskProvider extends ChangeNotifier {
       },
       onError: (e) {
         _error = friendlyError(e);
+        _problemsError = friendlyError(e);
         notifyListeners();
         _scheduleRestart(() => listenToProblems(isManager: isManager));
       },
@@ -256,6 +271,7 @@ class TaskProvider extends ChangeNotifier {
     },
     onError: (e) {
       _error = friendlyError(e);
+      _presetsError = friendlyError(e);
       notifyListeners();
       _scheduleRestart(() => _listenPresets(createdBy));
     });
@@ -680,6 +696,7 @@ class TaskProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _error = friendlyError(e);
+      _reportError = friendlyError(e);
       notifyListeners();
       return false;
     }

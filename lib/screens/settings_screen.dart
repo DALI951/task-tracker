@@ -267,7 +267,7 @@ class _PresetManagerState extends State<_PresetManager> {
   Widget build(BuildContext context) {
     final provider = context.watch<TaskProvider>();
     final presets = provider.presets;
-    final error = provider.error;
+    final error = provider.presetsError;
     return Column(
       children: [
         if (error != null)
