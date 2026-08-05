@@ -28,11 +28,22 @@ Future<void> _initApp() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (!kIsWeb) {
     runApp(TaskTrackerApp());
-    // Init push notifications after app is running (non-blocking)
-    PushNotificationService().initialize();
-    // Photo uploads can keep running in the background (Android)
-    PhotoUploadService().init();
-    PhotoUploadService().start();
+    // Init push notifications after app is running (non-blocking).
+    // All plugin init/startup calls are guarded so a plugin failure can
+    // never crash app startup.
+    try {
+      PushNotificationService().initialize();
+    } catch (e) {
+      // ignore
+    }
+    try {
+      PhotoUploadService().init();
+    } catch (e) {
+      // ignore
+    }
+    // The foreground service is started lazily from PhotoUploadService.enqueue()
+    // (which calls start() when a real job is queued). Not started here so a
+    // plugin/runtime issue on launch can never block the app from opening.
     try { Permission.requestInstallPackages.request(); } catch (_) {}
   } else {
     runApp(TaskTrackerApp());
