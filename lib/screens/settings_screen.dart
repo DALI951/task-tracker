@@ -7,6 +7,7 @@ import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/preset_task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/screens/manage_employees_screen.dart';
+import 'package:task_tracker/screens/notification_preferences_screen.dart';
 import 'package:task_tracker/screens/preset_items_screen.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
@@ -166,6 +167,17 @@ class SettingsScreen extends StatelessWidget {
             subtitle: Text(t('push_notifications_desc')),
             value: settings.notificationsEnabled,
             onChanged: (val) => settings.setNotificationsEnabled(val),
+          ),
+          ListTile(
+            leading: const Icon(Icons.tune),
+            title: Text(t('notification_preferences')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationPreferencesScreen(),
+              ),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.system_update_outlined),

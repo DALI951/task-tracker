@@ -13,6 +13,7 @@ import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
+import 'package:task_tracker/utils/device_utils.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final AppTask task;
@@ -48,12 +49,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Future<void> _pickAndSubmitProof() async {
     final picker = ImagePicker();
+    final maxDim = await pickerMaxDimension();
     final picked = await picker.pickImage(
       source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
           ? ImageSource.gallery
           : ImageSource.camera,
-      maxWidth: kIsWeb ? 1024 : 2048,
-      maxHeight: kIsWeb ? 1024 : 2048,
+      maxWidth: maxDim,
+      maxHeight: maxDim,
     );
     if (picked == null) return;
 
@@ -82,12 +84,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Future<void> _completeAsManager() async {
     final picker = ImagePicker();
+    final maxDim = await pickerMaxDimension();
     final picked = await picker.pickImage(
       source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
           ? ImageSource.gallery
           : ImageSource.camera,
-      maxWidth: kIsWeb ? 1024 : 2048,
-      maxHeight: kIsWeb ? 1024 : 2048,
+      maxWidth: maxDim,
+      maxHeight: maxDim,
     );
     if (picked == null) return;
 

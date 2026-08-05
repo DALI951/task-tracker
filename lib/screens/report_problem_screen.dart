@@ -8,6 +8,7 @@ import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
+import 'package:task_tracker/utils/device_utils.dart';
 
 class ReportProblemScreen extends StatefulWidget {
   const ReportProblemScreen({super.key});
@@ -30,12 +31,13 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
   Future<void> _takePhoto() async {
     final picker = ImagePicker();
+    final maxDim = await pickerMaxDimension();
     final picked = await picker.pickImage(
       source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
           ? ImageSource.gallery
           : ImageSource.camera,
-      maxWidth: kIsWeb ? 1024 : 2048,
-      maxHeight: kIsWeb ? 1024 : 2048,
+      maxWidth: maxDim,
+      maxHeight: maxDim,
     );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
