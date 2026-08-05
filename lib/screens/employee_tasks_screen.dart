@@ -14,6 +14,7 @@ import 'package:task_tracker/services/update_service.dart';
 
 import 'package:task_tracker/widgets/task_card.dart';
 import 'package:task_tracker/widgets/update_banner.dart';
+import 'package:task_tracker/widgets/notification_bell.dart';
 
 class EmployeeTasksScreen extends StatefulWidget {
   const EmployeeTasksScreen({super.key});
@@ -93,6 +94,7 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
               ),
             ),
           ),
+          const NotificationBell(),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Navigator.push(

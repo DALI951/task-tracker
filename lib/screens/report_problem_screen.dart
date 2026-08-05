@@ -51,14 +51,15 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
       final user = AuthService().currentUser;
       if (user == null) return;
       final name = await UserService().getDisplayName(user.email ?? '');
-      await context.read<TaskProvider>().reportProblem(
+      final ok = await context.read<TaskProvider>().reportProblem(
             reportedBy: user.email ?? '',
             reporterName: name,
             description: _descCtrl.text.trim(),
             photoBytes: _photoBytes,
             carOrThing: _selectedCarOrThing,
           );
-      if (mounted) {
+      if (!mounted) return;
+      if (ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Problem reported'),
@@ -66,6 +67,14 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           ),
         );
         Navigator.pop(context);
+      } else {
+        final err = context.read<TaskProvider>().error;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err ?? 'Failed to report problem'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

@@ -15,6 +15,7 @@ import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
 
 import 'package:task_tracker/utils/error_handler.dart';
+import 'package:task_tracker/widgets/notification_bell.dart';
 import 'package:task_tracker/widgets/task_card.dart';
 import 'package:task_tracker/widgets/update_banner.dart';
 
@@ -324,6 +325,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
               ),
             ],
           ),
+          const NotificationBell(),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

@@ -103,8 +103,15 @@ class UpdateService {
   }
 
   int _compareVersions(String a, String b) {
-    final aParts = a.split('.').map(int.tryParse).toList();
-    final bParts = b.split('.').map(int.tryParse).toList();
+    // GitHub tags carry the build number (e.g. v0.4.8+1) while the installed
+    // version does not. Strip the +build suffix so "0.4.8+1" compares as
+    // "0.4.8" instead of parsing "+1" as null -> 0.
+    int? parsePart(String s) {
+      return int.tryParse(s.split('+').first.trim());
+    }
+
+    final aParts = a.split('.').map(parsePart).toList();
+    final bParts = b.split('.').map(parsePart).toList();
     final len = aParts.length > bParts.length ? aParts.length : bParts.length;
     for (var i = 0; i < len; i++) {
       final av = i < aParts.length ? (aParts[i] ?? 0) : 0;

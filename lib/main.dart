@@ -8,6 +8,7 @@ import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/firebase_options.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_gate.dart';
+import 'package:task_tracker/services/photo_upload.dart';
 import 'package:task_tracker/services/push_notification_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_download_manager.dart';
@@ -29,6 +30,9 @@ Future<void> _initApp() async {
     runApp(TaskTrackerApp());
     // Init push notifications after app is running (non-blocking)
     PushNotificationService().initialize();
+    // Photo uploads can keep running in the background (Android)
+    PhotoUploadService().init();
+    PhotoUploadService().start();
     try { Permission.requestInstallPackages.request(); } catch (_) {}
   } else {
     runApp(TaskTrackerApp());
@@ -81,7 +85,11 @@ class TaskTrackerApp extends StatelessWidget {
           s.load();
           return s;
         }),
-        ChangeNotifierProvider(create: (_) => UpdateDownloadManager()),
+        ChangeNotifierProvider(create: (_) {
+          final m = UpdateDownloadManager();
+          m.restore();
+          return m;
+        }),
       ],
       child: Builder(
         builder: (context) {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:task_tracker/config/app_secret.dart';
 
 class FcmSender {
   static final FcmSender _instance = FcmSender._();
@@ -21,7 +22,10 @@ class FcmSender {
       final response = await http
           .post(
             Uri.parse(_sendUrl),
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'X-App-Secret': appSecret,
+            },
             body: json.encode({
               'token': token,
               'title': title,

@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../lib/config.php';
+
 // Photo upload endpoint.
 // Native app clients POST the raw image bytes (body) with a suggested
 // `path` query string, e.g. ?path=task_photos/<taskId>/proof_<ts>.jpg
@@ -15,7 +17,7 @@ ini_set('max_execution_time', '60');
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, X-App-Secret');
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     http_response_code(204);
@@ -27,6 +29,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     echo json_encode(['ok' => false, 'error' => 'Method not allowed']);
     exit;
 }
+
+// Only the app knows the shared secret. Without it, this endpoint is an
+// anonymous 14 MB disk-fill hole.
+tt_require_app_secret();
 
 $bytes = file_get_contents('php://input');
 if ($bytes === false || $bytes === '') {
