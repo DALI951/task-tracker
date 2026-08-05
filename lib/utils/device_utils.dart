@@ -12,16 +12,16 @@ Future<double> pickerMaxDimension() async {
   return 2048;
 }
 
-/// True on low-RAM Android devices (< 2 GB physical RAM). These phones
-/// commonly kill the Flutter process while the camera app is open; a smaller
-/// decode budget reduces that pressure.
+/// True on low-RAM Android devices (< 4 GB physical RAM). Budget phones
+/// (e.g. Galaxy A03s with 3 GB) commonly kill the Flutter process while the
+/// camera app is open; a smaller decode budget reduces that pressure.
 Future<bool> isLowEndDevice() async {
   if (kIsWeb) return false;
   try {
     final info = await DeviceInfoPlugin().androidInfo;
     final ramMb = info.physicalRamSize ?? 0;
     if (ramMb <= 0) return false;
-    return ramMb < 2048;
+    return ramMb < 4096;
   } catch (_) {
     return false;
   }

@@ -16,7 +16,7 @@ final FlutterLocalNotificationsPlugin _localNotifications =
 @pragma('vm:entry-point')
 Future<void> _onBackgroundMessage(RemoteMessage message) async {}
 
-class PushNotificationService {
+class PushNotificationService with WidgetsBindingObserver {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -24,6 +24,8 @@ class PushNotificationService {
       PushNotificationService._();
   factory PushNotificationService() => _instance;
   PushNotificationService._();
+
+  String? _lastUid;
 
   NavigatorState? _navigator;
   ScaffoldMessengerState? _scaffoldMessenger;
@@ -41,6 +43,8 @@ class PushNotificationService {
   Future<void> initialize() async {
     if (kIsWeb) return;
 
+    WidgetsBinding.instance.addObserver(this);
+
     await _requestPermission();
     await _createNotificationChannel();
     await _initLocalNotifications();
@@ -51,6 +55,8 @@ class PushNotificationService {
     FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user != null) {
         _saveToken();
+      } else {
+        _clearStaleToken();
       }
     });
 
@@ -62,6 +68,15 @@ class PushNotificationService {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _onMessageOpenedApp(initialMessage);
       });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-save the token whenever the app comes to the foreground so a token
+    // that rotates after an app reinstall/update is replaced promptly.
+    if (state == AppLifecycleState.resumed) {
+      _saveToken();
     }
   }
 
@@ -104,6 +119,9 @@ class PushNotificationService {
 
   Future<void> _saveToken() async {
     if (kIsWeb) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    _lastUid = user.uid;
     final token = await _messaging.getToken();
     if (token != null) await _saveTokenToFirestore(token);
   }
@@ -117,6 +135,21 @@ class PushNotificationService {
       }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('Failed to save FCM token: $e');
+    }
+  }
+
+  /// Removes the stored token for the last signed-in user when they sign out,
+  /// so a dead token never lingers on the doc and blocks later pushes.
+  Future<void> _clearStaleToken() async {
+    if (_lastUid == null) return;
+    final uid = _lastUid;
+    _lastUid = null;
+    try {
+      await _db.collection('users').doc(uid).update({
+        'fcmToken': FieldValue.delete(),
+      });
+    } catch (e) {
+      debugPrint('Failed to clear FCM token: $e');
     }
   }
 
