@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Tracker - Manager Account</title>
+    <title>Task Tracker - Manager</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -17,23 +17,19 @@
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; }
         .form-group input { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
         .form-group input:focus { outline: none; border-color: #E53935; box-shadow: 0 0 0 3px rgba(229,57,53,0.1); }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.15s; text-decoration: none; display: block; text-align: center; }
         .btn-primary { background: #E53935; color: white; }
         .btn-primary:hover { background: #C62828; }
         .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
         .btn-secondary { background: #f0f0f0; color: #333; margin-top: 8px; }
         .btn-secondary:hover { background: #e0e0e0; }
         .btn-big { padding: 18px; font-size: 16px; margin-bottom: 12px; }
-        .action-btn { display: flex; align-items: center; gap: 12px; }
-        .action-btn .btn-icon { width: 36px; height: 36px; border-radius: 8px; background: rgba(229,57,53,0.1); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .action-btn .btn-icon svg { width: 20px; height: 20px; fill: #E53935; }
-        .action-btn .btn-label { flex: 1; text-align: left; }
-        .action-btn .btn-label .title { font-size: 15px; font-weight: 600; color: #1a1a1a; }
-        .action-btn .btn-label .sub { font-size: 12px; color: #888; }
         .message { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
         .message.success { background: #e8f5e9; color: #2e7d32; }
         .message.error { background: #ffebee; color: #c62828; }
         .hidden { display: none; }
+        .account-email { text-align: center; font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 20px; }
+        .note { font-size: 12px; color: #888; text-align: center; margin-top: 12px; }
     </style>
 </head>
 <body>
@@ -47,54 +43,45 @@
                 <h1>Task Tracker</h1>
                 <p>Manager account</p>
             </div>
-            <button class="btn btn-primary btn-big" onclick="showScreen('passphraseScreen')">Create Account</button>
+            <button class="btn btn-primary btn-big" onclick="showScreen('signinScreen')">Sign In</button>
+            <a class="btn btn-secondary btn-big" href="http://modali.powerpme.com/tasktracker/" target="_blank" rel="noopener">Create Account (secure page)</a>
             <button class="btn btn-secondary btn-big" onclick="showScreen('changeScreen')">Change Password</button>
         </div>
 
-        <!-- Passphrase -->
-        <div id="passphraseScreen" class="screen hidden">
+        <!-- Sign in -->
+        <div id="signinScreen" class="screen hidden">
             <div class="header">
                 <div class="icon">
-                    <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                    <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
                 </div>
-                <h1>Enter Passphrase</h1>
-            </div>
-            <div class="form-group">
-                <label>Passphrase</label>
-                <input type="password" id="passphrase" placeholder="Passphrase" onkeypress="if(event.key==='Enter')checkPassphrase()">
-            </div>
-            <button class="btn btn-primary" onclick="checkPassphrase()">Continue</button>
-            <button class="btn btn-secondary" onclick="showScreen('homeScreen')">Back</button>
-            <div id="passMsg"></div>
-        </div>
-
-        <!-- Create account -->
-        <div id="signupScreen" class="screen hidden">
-            <div class="header">
-                <div class="icon">
-                    <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                </div>
-                <h1>Create Manager Account</h1>
-            </div>
-            <div class="form-group">
-                <label>Full Name</label>
-                <input type="text" id="suName" placeholder="John Doe">
+                <h1>Sign In</h1>
             </div>
             <div class="form-group">
                 <label>Email</label>
-                <input type="email" id="suEmail" placeholder="user@example.com">
+                <input type="email" id="siEmail" placeholder="user@example.com" onkeypress="if(event.key==='Enter')signIn()">
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="suPass" placeholder="Min 6 characters">
+                <input type="password" id="siPass" placeholder="Password" onkeypress="if(event.key==='Enter')signIn()">
             </div>
-            <div class="form-group">
-                <label>Confirm Password</label>
-                <input type="password" id="suPass2" placeholder="Repeat password" onkeypress="if(event.key==='Enter')createAccount()">
-            </div>
-            <button class="btn btn-primary" id="createBtn" onclick="createAccount()">Create Account</button>
+            <button class="btn btn-primary" id="siBtn" onclick="signIn()">Sign In</button>
             <button class="btn btn-secondary" onclick="showScreen('homeScreen')">Back</button>
-            <div id="signupMsg"></div>
+            <div id="signinMsg"></div>
+        </div>
+
+        <!-- Account (signed in) -->
+        <div id="accountScreen" class="screen hidden">
+            <div class="header">
+                <div class="icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                </div>
+                <h1>Signed In</h1>
+            </div>
+            <div class="account-email" id="accountEmail"></div>
+            <button class="btn btn-primary btn-big" id="cpSignedBtn" onclick="resetForSignedIn()">Change Password</button>
+            <a class="btn btn-secondary btn-big" href="https://dali951.github.io/task-tracker/" target="_blank" rel="noopener">Open the app</a>
+            <button class="btn btn-secondary btn-big" onclick="signOut()">Sign Out</button>
+            <div id="accountMsg"></div>
         </div>
 
         <!-- Change password -->
@@ -118,8 +105,7 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
-        import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
-        import { getFirestore, doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
+        import { getAuth, signInWithEmailAndPassword, signOut as fbSignOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyCq3-FOmjHuQH86QfA5Vf7c8hyneS0nbC0",
@@ -130,11 +116,8 @@
             appId: "1:202182349540:web:ac882cbe77afa54f5752f1"
         };
 
-        const PASSPHRASE = 'tasktracker2024';
-
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
 
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden'));
@@ -145,71 +128,81 @@
             const el = document.getElementById(id);
             el.className = 'message ' + type;
             el.textContent = text;
-            setTimeout(() => { el.textContent = ''; el.className = ''; }, 6000);
+            setTimeout(() => { el.textContent = ''; el.className = ''; }, 8000);
         }
 
-        window.checkPassphrase = function () {
-            const val = document.getElementById('passphrase').value;
-            if (val !== PASSPHRASE) {
-                showMessage('Wrong passphrase.', 'error', 'passMsg');
-                return;
-            }
-            document.getElementById('passphrase').value = '';
-            showScreen('signupScreen');
-        };
+        function friendlyError(e) {
+            const map = {
+                'auth/invalid-credential': 'Wrong email or password.',
+                'auth/user-not-found': 'No account found with this email.',
+                'auth/wrong-password': 'Wrong password.',
+                'auth/invalid-email': 'That email address looks invalid.',
+                'auth/email-already-in-use': 'An account with this email already exists.',
+                'auth/weak-password': 'Password must be at least 6 characters.',
+                'auth/unauthorized-domain': 'This domain is not authorized for sign-in. Add it in Firebase Auth settings.',
+                'auth/network-request-failed': 'Network error. Check your connection and try again.',
+                'auth/too-many-requests': 'Too many attempts. Wait a moment and try again.',
+            };
+            return map[e.code] || (e.code ? e.code + ': ' + e.message : 'Something went wrong. Please try again.');
+        }
 
-        window.createAccount = async function () {
-            const name = document.getElementById('suName').value.trim();
-            const email = document.getElementById('suEmail').value.trim();
-            const password = document.getElementById('suPass').value;
-            const password2 = document.getElementById('suPass2').value;
-
-            if (!name || !email || !password) {
-                showMessage('All fields are required', 'error', 'signupMsg');
+        window.signIn = async function () {
+            const email = document.getElementById('siEmail').value.trim();
+            const password = document.getElementById('siPass').value;
+            if (!email || !password) {
+                showMessage('Enter your email and password.', 'error', 'signinMsg');
                 return;
             }
-            if (password.length < 6) {
-                showMessage('Password must be at least 6 characters', 'error', 'signupMsg');
-                return;
-            }
-            if (password !== password2) {
-                showMessage('Passwords do not match', 'error', 'signupMsg');
-                return;
-            }
-
-            const btn = document.getElementById('createBtn');
+            const btn = document.getElementById('siBtn');
             btn.disabled = true;
-            btn.textContent = 'Creating...';
+            btn.textContent = 'Signing in...';
             try {
-                const cred = await createUserWithEmailAndPassword(auth, email, password);
-                await setDoc(doc(db, 'users', cred.user.uid), {
-                    role: 'manager',
-                    email,
-                    name,
-                    displayName: name,
-                    createdAt: serverTimestamp(),
-                });
-                showMessage('Account created! You can now sign in with this email.', 'success', 'signupMsg');
-                document.getElementById('suName').value = '';
-                document.getElementById('suEmail').value = '';
-                document.getElementById('suPass').value = '';
-                document.getElementById('suPass2').value = '';
+                const cred = await signInWithEmailAndPassword(auth, email, password);
+                document.getElementById('accountEmail').textContent = cred.user.email || '';
+                document.getElementById('cpEmail').value = cred.user.email || '';
+                document.getElementById('siPass').value = '';
+                showScreen('accountScreen');
             } catch (e) {
-                let msg = 'Failed to create account.';
-                if (e.code === 'auth/email-already-in-use') msg = 'An account with this email already exists.';
-                if (e.code === 'auth/invalid-email') msg = 'That email address looks invalid.';
-                if (e.code === 'auth/weak-password') msg = 'Password must be at least 6 characters.';
-                showMessage(msg, 'error', 'signupMsg');
+                showMessage(friendlyError(e), 'error', 'signinMsg');
             } finally {
                 btn.disabled = false;
-                btn.textContent = 'Create Account';
+                btn.textContent = 'Sign In';
+            }
+        };
+
+        window.signOut = async function () {
+            try {
+                await fbSignOut(auth);
+            } catch (e) {
+                // Sign-out rarely fails; still return home.
+            }
+            showScreen('homeScreen');
+        };
+
+        window.resetForSignedIn = async function () {
+            const email = auth.currentUser ? auth.currentUser.email : '';
+            if (!email) {
+                showMessage('You are not signed in.', 'error', 'accountMsg');
+                return;
+            }
+            const btn = document.getElementById('cpSignedBtn');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+            try {
+                await sendPasswordResetEmail(auth, email);
+                showMessage('Reset email sent to ' + email + '. Check your inbox.', 'success', 'accountMsg');
+            } catch (e) {
+                showMessage(friendlyError(e), 'error', 'accountMsg');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Change Password';
             }
         };
 
         window.sendReset = async function () {
             const email = document.getElementById('cpEmail').value.trim();
             if (!email) {
-                showMessage('Enter your email address', 'error', 'cpMsg');
+                showMessage('Enter your email address.', 'error', 'cpMsg');
                 return;
             }
             const btn = document.getElementById('cpBtn');
@@ -219,10 +212,7 @@
                 await sendPasswordResetEmail(auth, email);
                 showMessage('Reset email sent. Check your inbox and click the link to set a new password.', 'success', 'cpMsg');
             } catch (e) {
-                let msg = 'Failed to send the reset email.';
-                if (e.code === 'auth/invalid-email') msg = 'That email address looks invalid.';
-                if (e.code === 'auth/user-not-found') msg = 'No account found with this email.';
-                showMessage(msg, 'error', 'cpMsg');
+                showMessage(friendlyError(e), 'error', 'cpMsg');
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Send Reset Email';
