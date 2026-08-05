@@ -219,17 +219,6 @@ lib/
 </details>
 
 <details>
-<summary><strong>web_admin/</strong> — Account creation pages</summary>
-
-```
-web_admin/
-├── index.html          # Admin account creator (passphrase-gated)
-└── moderator.html      # Moderator self-service page
-```
-
-</details>
-
-<details>
 <summary><strong>firestore.rules</strong> — Security rules</summary>
 
 ```

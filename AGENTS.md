@@ -25,7 +25,7 @@ Single unified Flutter app with role-based UI:
 - **Email-already-exists:** interim dialog offers only "Send password reset email" (client SDK can't replace/link/read an existing account's uid). Full Replace / Use Existing / Change Password returns with the PHP backend.
 - **Reset password:** `sendPasswordResetEmail(email)` — the employee sets their own password via email link.
 - **Delete employee:** deletes the `employees/{email}` directory doc. `lib/services/auth_gate.dart` blocks employees whose directory doc is missing (fail-open on read errors so a rules-rollout gap never locks out real employees). The Firebase Auth account itself is NOT deleted until the PHP backend exists.
-- Manager accounts: `web_admin/index.html` invite page calls undeployed Cloud Functions and is **currently non-functional (dormant)**; it will be replaced by the PHP admin site.
+- Manager accounts: created server-side via the PHP admin site (`server/`, live at `http://modali.powerpme.com/tasktracker/`). No browser-based create page is deployed (the old `web_admin` folder was removed).
 - `UserService.ensureManager()` / `ensureEmployee()` are NOT called at runtime; roles come from the `users/{uid}` document.
 - **No sign-up in app.**
 
@@ -80,7 +80,7 @@ Single unified Flutter app with role-based UI:
 | `lib/services/user_service.dart` | Role management (getRole) |
 | `lib/services/storage_service.dart` | Photo upload (interim base64) |
 | `functions/index.js` | Reference Cloud Functions implementation — NOT deployed, NOT used by the client |
-| `web_admin/index.html` | Invite page — dormant until the PHP admin site replaces it |
+| `server/` | PHP admin backend (manager account creation + FCM push) — see `server/` for details |
 | `firestore.indexes.json` | Composite indexes (presets, preset items, pending review, notifications) — deployed via `firebase deploy --only firestore` |
 | `windows/installer/task-tracker-setup.iss` | Inno Setup installer script |
 
