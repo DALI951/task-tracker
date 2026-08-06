@@ -36,6 +36,24 @@ class StorageService {
     return base64Encode(bytes);
   }
 
+  /// Runs independently of the current route. The provider can therefore
+  /// continue uploading when the user navigates away from the form.
+  Future<List<String>> uploadImages(
+    List<Uint8List> images,
+    String pathPrefix, {
+    void Function(int completed, int total)? onProgress,
+  }) async {
+    final urls = <String>[];
+    for (var i = 0; i < images.length; i++) {
+      urls.add(await uploadImage(
+        images[i],
+        '$pathPrefix/photo_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      ));
+      onProgress?.call(i + 1, images.length);
+    }
+    return urls;
+  }
+
   /// True for remote URLs (the new photo format). False for inline base64
   /// stored on task/problem documents.
   static bool isRemotePhoto(String value) {

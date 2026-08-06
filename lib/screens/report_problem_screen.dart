@@ -19,7 +19,7 @@ class ReportProblemScreen extends StatefulWidget {
 
 class _ReportProblemScreenState extends State<ReportProblemScreen> {
   final _descCtrl = TextEditingController();
-  Uint8List? _photoBytes;
+  final List<Uint8List> _photos = [];
   String? _selectedCarOrThing;
   bool _sending = false;
 
@@ -39,9 +39,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
       maxWidth: maxDim,
       maxHeight: maxDim,
     );
-    if (picked == null) return;
+    if (picked == null || _photos.length >= 50) return;
     final bytes = await picked.readAsBytes();
-    setState(() => _photoBytes = bytes);
+    setState(() => _photos.add(bytes));
   }
 
   Future<void> _send() async {
@@ -55,7 +55,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             reportedBy: user.email ?? '',
             reporterName: name,
             description: _descCtrl.text.trim(),
-            photoBytes: _photoBytes,
+            photos: _photos,
             carOrThing: _selectedCarOrThing,
           );
       if (!mounted) return;
@@ -121,23 +121,44 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               onChanged: (v) => setState(() => _selectedCarOrThing = v),
             ),
           const SizedBox(height: 16),
-          if (_photoBytes != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.memory(
-                _photoBytes!,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
+          if (_photos.isNotEmpty)
+            SizedBox(
+              height: 100,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _photos.length,
+                itemBuilder: (_, i) => Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 8),
+                  child: Stack(children: [
+                    Image.memory(_photos[i], width: 100, height: 100, fit: BoxFit.cover),
+                    PositionedDirectional(top: 0, end: 0, child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => setState(() => _photos.removeAt(i)),
+                    )),
+                  ]),
+                ),
               ),
             ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: _takePhoto,
+            onPressed: _photos.length >= 50 ? null : _takePhoto,
             icon: const Icon(Icons.camera_alt),
-            label: Text(_photoBytes == null ? t('take_photo') : t('retake')),
+            label: Text('${t('take_photo')} (${_photos.length}/50)'),
           ),
           const SizedBox(height: 24),
+          if (context.watch<TaskProvider>().uploadingPhotos)
+            Row(children: [
+              Expanded(child: LinearProgressIndicator(
+                value: context.read<TaskProvider>().uploadTotal == 0
+                    ? null
+                    : context.read<TaskProvider>().uploadCompleted /
+                        context.read<TaskProvider>().uploadTotal,
+              )),
+              const SizedBox(width: 8),
+              Text('${context.read<TaskProvider>().uploadCompleted}/${context.read<TaskProvider>().uploadTotal}'),
+            ]),
+          if (context.watch<TaskProvider>().uploadingPhotos)
+            const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             height: 48,

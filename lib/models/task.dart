@@ -37,6 +37,11 @@ class AppTask {
   final String? claimedBy;
   final String? claimedByName;
   final String? photoUrl;
+  final List<String> photoUrls;
+  final String? completionDescription;
+  final bool uploadsComplete;
+  final int uploadCompleted;
+  final int uploadTotal;
   final String? customer;
   final String? carOrThing;
   final String? presetId;
@@ -57,6 +62,11 @@ class AppTask {
     this.claimedBy,
     this.claimedByName,
     this.photoUrl,
+    this.photoUrls = const [],
+    this.completionDescription,
+    this.uploadsComplete = true,
+    this.uploadCompleted = 0,
+    this.uploadTotal = 0,
     this.customer,
     this.carOrThing,
     this.presetId,
@@ -84,6 +94,12 @@ class AppTask {
       claimedBy: map['claimedBy'] as String?,
       claimedByName: map['claimedByName'] as String?,
       photoUrl: map['photoUrl'] as String?,
+      photoUrls: (map['photoUrls'] as List<dynamic>?)?.cast<String>() ??
+          (map['photoUrl'] is String ? [map['photoUrl'] as String] : const []),
+      completionDescription: map['completionDescription'] as String?,
+      uploadsComplete: map['uploadsComplete'] as bool? ?? true,
+      uploadCompleted: map['uploadCompleted'] as int? ?? 0,
+      uploadTotal: map['uploadTotal'] as int? ?? 0,
       customer: map['customer'] as String?,
       carOrThing: map['carOrThing'] as String?,
       presetId: map['presetId'] as String?,
@@ -109,6 +125,11 @@ class AppTask {
       'claimedBy': claimedBy,
       'claimedByName': claimedByName,
       'photoUrl': photoUrl,
+      'photoUrls': photoUrls,
+      'completionDescription': completionDescription,
+      'uploadsComplete': uploadsComplete,
+      'uploadCompleted': uploadCompleted,
+      'uploadTotal': uploadTotal,
       'customer': customer,
       'carOrThing': carOrThing,
       'presetId': presetId,

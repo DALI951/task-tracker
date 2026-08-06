@@ -61,6 +61,12 @@ class TaskProvider extends ChangeNotifier {
   String? get problemsError => _problemsError;
   String? get presetsError => _presetsError;
   String? get reportError => _reportError;
+  int _uploadCompleted = 0;
+  int _uploadTotal = 0;
+  bool _uploadingPhotos = false;
+  int get uploadCompleted => _uploadCompleted;
+  int get uploadTotal => _uploadTotal;
+  bool get uploadingPhotos => _uploadingPhotos;
 
   void clearError() {
     _error = null;
@@ -263,6 +269,7 @@ class TaskProvider extends ChangeNotifier {
   void _listenPresets(String createdBy) {
     _presetSub?.cancel();
     _presetSub = _firestore.presetsStream(createdBy).listen((snapshot) {
+      _presetsError = null;
       _presets = snapshot.docs.map((doc) {
         return PresetTask.fromMap(doc.data() as Map<String, dynamic>, doc.id);
       }).toList()
@@ -359,6 +366,7 @@ class TaskProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _error = friendlyError(e);
+      _presetsError = _error;
       notifyListeners();
       return false;
     }
@@ -397,6 +405,7 @@ class TaskProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _error = friendlyError(e);
+      _presetsError = _error;
       notifyListeners();
       return false;
     }
@@ -432,22 +441,58 @@ class TaskProvider extends ChangeNotifier {
 
   Future<bool> completeTaskWithProof({
     required String taskId,
-    required Uint8List imageBytes,
+    required List<Uint8List> images,
+    String? completionDescription,
   }) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) { _error = 'Not signed in'; notifyListeners(); return false; }
-      final photoUrl = await _storage.uploadImage(
-        imageBytes,
-        'task_photos/$taskId/proof_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      );
+      _uploadCompleted = 0;
+      _uploadTotal = images.length;
+      _uploadingPhotos = true;
+      notifyListeners();
+      final photoUrls = <String>[];
+      if (images.isNotEmpty) {
+        await _firestore.updateTask(taskId, {
+          'status': 'uploading',
+          'photoUrl': null,
+          'photoUrls': <String>[],
+          'completionDescription': completionDescription,
+          'uploadsComplete': false,
+          'uploadCompleted': 0,
+          'uploadTotal': images.length,
+          'completedAt': null,
+          'rejectionReason': null,
+        });
+        for (var i = 0; i < images.length; i++) {
+          final url = await _storage.uploadImage(
+            images[i],
+            'task_photos/$taskId/photo_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          );
+          photoUrls.add(url);
+          _uploadCompleted = i + 1;
+          notifyListeners();
+          await _firestore.updateTask(taskId, {
+            'photoUrls': photoUrls,
+            'uploadCompleted': _uploadCompleted,
+            'uploadTotal': images.length,
+          });
+        }
+      }
       await _firestore.updateTask(taskId, {
         'status': 'pending_review',
-        'photoUrl': photoUrl,
+        'photoUrl': photoUrls.isEmpty ? null : photoUrls.first,
+        'photoUrls': photoUrls,
+        'completionDescription': completionDescription,
+        'uploadsComplete': true,
+        'uploadCompleted': photoUrls.length,
+        'uploadTotal': images.length,
         'completedAt': DateTime.now(),
         'rejectionReason': null,
       });
       _addHistory(taskId, 'submitted_proof', user.displayName ?? user.email ?? '');
+      _uploadingPhotos = false;
+      notifyListeners();
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
       if (task != null) {
       _notif.send(
@@ -461,6 +506,7 @@ class TaskProvider extends ChangeNotifier {
       }
       return true;
     } catch (e) {
+      _uploadingPhotos = false;
       _error = friendlyError(e);
       notifyListeners();
       return false;
@@ -499,6 +545,8 @@ class TaskProvider extends ChangeNotifier {
       await _firestore.updateTask(taskId, {
         'status': 'doing',
         'photoUrl': null,
+        'photoUrls': [],
+        'uploadsComplete': true,
         'completedAt': null,
         'rejectionReason': reason,
       });
@@ -516,6 +564,26 @@ class TaskProvider extends ChangeNotifier {
       }
       return true;
     } catch (e) {
+      _error = friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> withdrawTaskSubmission(String taskId) async {
+    try {
+      await _firestore.updateTask(taskId, {
+        'status': 'doing',
+        'photoUrl': null,
+        'photoUrls': [],
+        'completionDescription': null,
+        'completedAt': null,
+        'uploadsComplete': true,
+      });
+      _addHistory(taskId, 'withdrawn', '');
+      return true;
+    } catch (e) {
+      _uploadingPhotos = false;
       _error = friendlyError(e);
       notifyListeners();
       return false;
@@ -609,6 +677,7 @@ class TaskProvider extends ChangeNotifier {
   Future<bool> addPreset(PresetTask preset) async {
     try {
       await _firestore.addPreset(preset);
+      _presetsError = null;
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -620,6 +689,7 @@ class TaskProvider extends ChangeNotifier {
   Future<bool> deletePreset(String id) async {
     try {
       await _firestore.deletePreset(id);
+      _presetsError = null;
       return true;
     } catch (e) {
       _error = friendlyError(e);
@@ -666,7 +736,7 @@ class TaskProvider extends ChangeNotifier {
     required String reportedBy,
     required String reporterName,
     required String description,
-    Uint8List? photoBytes,
+    List<Uint8List> photos = const [],
     String? carOrThing,
   }) async {
     try {
@@ -685,18 +755,24 @@ class TaskProvider extends ChangeNotifier {
         return false;
       }
 
-      String? photoUrl;
-      if (photoBytes != null) {
-        photoUrl = await _storage.uploadImage(
-          photoBytes,
-          'problem_photos/${reportedBy}_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        );
-      }
+      _uploadCompleted = 0;
+      _uploadTotal = photos.length;
+      _uploadingPhotos = true;
+      final photoUrls = await _storage.uploadImages(
+        photos,
+        'problem_photos/${reportedBy}_${DateTime.now().millisecondsSinceEpoch}',
+        onProgress: (done, total) {
+          _uploadCompleted = done;
+          _uploadTotal = total;
+          notifyListeners();
+        },
+      );
       await _firestore.addProblem({
         'reportedBy': reportedBy,
         'reporterName': reporterName,
         'description': description,
-        'photoUrl': photoUrl,
+        'photoUrl': photoUrls.isEmpty ? null : photoUrls.first,
+        'photoUrls': photoUrls,
         'carOrThing': carOrThing,
         'managerEmail': managerEmail,
         'createdAt': DateTime.now(),
@@ -710,8 +786,11 @@ class TaskProvider extends ChangeNotifier {
         message: _t('notif_problem_reported_msg').replaceAll('{name}', reporterName),
         senderName: reporterName,
       );
+      _uploadingPhotos = false;
+      notifyListeners();
       return true;
     } catch (e) {
+      _uploadingPhotos = false;
       _error = friendlyError(e);
       _reportError = friendlyError(e);
       notifyListeners();
@@ -727,6 +806,7 @@ class TaskProvider extends ChangeNotifier {
       });
     } catch (e) {
       _error = friendlyError(e);
+      _presetsError = friendlyError(e);
       notifyListeners();
       return false;
     }
@@ -746,14 +826,16 @@ class TaskProvider extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> assignProblem(String problemId, String taskId) async {
+  Future<bool> assignProblem(String problemId, String taskId, String employeeName) async {
     try {
       await _firestore.updateProblem(problemId, {
         'status': 'assigned',
         'convertedToTaskId': taskId,
+        'assignedToName': employeeName,
       });
     } catch (e) {
       _error = friendlyError(e);
+      _presetsError = friendlyError(e);
       notifyListeners();
       return false;
     }
@@ -771,6 +853,29 @@ class TaskProvider extends ChangeNotifier {
       } catch (_) {}
     }
     return true;
+  }
+
+  /// Creates the task and changes the problem together from the UI's point of
+  /// view. If the second write fails, remove the new task so the problem does
+  /// not appear assigned without its converted task.
+  Future<String?> convertProblemToTask({
+    required Problem problem,
+    required String employeeName,
+    required String employeeEmail,
+  }) async {
+    final taskId = await addTask(
+      title: problem.description.split('\n').first,
+      description: problem.description,
+      assignedTo: employeeName,
+      assignedToEmail: employeeEmail,
+      carOrThing: problem.carOrThing,
+    );
+    if (taskId == null) return null;
+    if (await assignProblem(problem.id, taskId, employeeName)) return taskId;
+    try {
+      await _firestore.deleteTask(taskId);
+    } catch (_) {}
+    return null;
   }
 
   Future<void> exportToClipboard() async {

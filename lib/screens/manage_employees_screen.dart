@@ -19,6 +19,8 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   final _emailCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  bool _emailConflict = false;
+  String? _createError;
 
   @override
   void dispose() {
@@ -32,18 +34,32 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     _emailCtrl.clear();
     _nameCtrl.clear();
     _passCtrl.clear();
+    _emailConflict = false;
+    _createError = null;
     showDialog(
       context: context,
       builder: (ctx) {
         bool showPass = false;
         bool creating = false;
+        String? emailError;
         return StatefulBuilder(
           builder: (ctx, setDState) {
             return AlertDialog(
               title: Text(context.read<SettingsService>().t('new_employee')),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
+               children: [
+                  if (emailError != null)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(emailError!, style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.w600,
+                        )),
+                      ),
+                    ),
                   TextField(
                     controller: _emailCtrl,
                     decoration: const InputDecoration(
@@ -103,24 +119,28 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                                 toast(context, 'Employee created');
                               }
                             } else {
-                              setDState(() => creating = false);
+                              setDState(() {
+                                creating = false;
+                                emailError = _emailConflict
+                                    ? 'Email already used — choose another email'
+                                    : _createError;
+                                if (_emailConflict) {
+                                  _emailCtrl.clear();
+                                }
+                              });
                             }
                           } on FirebaseAuthException catch (e) {
-                            setDState(() => creating = false);
-                            if (mounted) {
-                              toast(
-                                context,
-                                e.code == 'invalid-email'
-                                    ? 'Invalid email address'
-                                    : friendlyError(e),
-                                error: true,
-                              );
-                            }
+                            setDState(() {
+                              creating = false;
+                              emailError = e.code == 'invalid-email'
+                                  ? 'Invalid email address'
+                                  : friendlyError(e);
+                            });
                           } catch (e) {
-                            setDState(() => creating = false);
-                            if (mounted) {
-                              toast(context, friendlyError(e), error: true);
-                            }
+                            setDState(() {
+                              creating = false;
+                              emailError = friendlyError(e);
+                            });
                           }
                         },
                   child: creating
@@ -145,6 +165,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   /// Returns true when the account was created and the directory doc written.
   Future<bool> _createEmployeeAccount(
       String email, String name, String password) async {
+    _createError = null;
     final auth = FirebaseAuth.instance;
     final managerEmail = auth.currentUser?.email ?? '';
 
@@ -152,7 +173,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       final managerPass = await _promptManagerPassword();
       if (managerPass == null || managerPass.isEmpty) return false;
       if (!await _validateManagerPassword(managerEmail, managerPass)) {
-        if (mounted) toast(context, 'Wrong password', error: true);
+        _createError = 'Wrong password';
         return false;
       }
       ManagerSession.cache(managerEmail, managerPass);
@@ -166,7 +187,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       );
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
-        await _showEmailConflict(email);
+        _emailConflict = true;
         return false;
       }
       rethrow;
@@ -178,6 +199,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       await cred.user!.updateDisplayName(name);
     } catch (_) {}
 
+    String? setupError;
     try {
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'email': email,
@@ -186,13 +208,8 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      // The Auth account exists but the role doc failed to write; it will show
-      // as "not configured" until the backend can clean it up. Continue so the
-      // manager session is restored.
-      if (mounted) {
-        toast(context, 'Employee created but role document failed',
-            error: true);
-      }
+      // Restore the manager first, then show this error in the still-open form.
+      setupError = 'Employee account created but setup failed: ${friendlyError(e)}';
     }
 
     await auth.signInWithEmailAndPassword(
@@ -209,6 +226,11 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
           'name': name,
           'authUid': uid,
         }, SetOptions(merge: true));
+
+    if (setupError != null) {
+      _createError = setupError;
+      return false;
+    }
 
     return true;
   }
@@ -282,55 +304,6 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     );
     ctrl.dispose();
     return (result == null || result.isEmpty) ? null : result;
-  }
-
-  Future<void> _showEmailConflict(String email) async {
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        bool sending = false;
-        return StatefulBuilder(
-          builder: (ctx, setDState) => AlertDialog(
-            title: const Text('Email Already Registered'),
-            content: const Text(
-                'An account with this email already exists. The full conflict '
-                'options will return with the new backend. For now you can '
-                'send a password-reset link to this email, or cancel.'),
-            actions: [
-              TextButton(
-                onPressed: sending ? null : () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: sending
-                    ? null
-                    : () async {
-                        setDState(() => sending = true);
-                        try {
-                          await FirebaseAuth.instance
-                              .sendPasswordResetEmail(email: email);
-                          if (ctx.mounted) Navigator.pop(ctx);
-                          if (mounted) toast(context, 'Reset email sent');
-                        } catch (e) {
-                          setDState(() => sending = false);
-                          if (mounted) {
-                            toast(context, friendlyError(e), error: true);
-                          }
-                        }
-                      },
-                child: sending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Send Reset Email'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   void _renameEmployee(String email, String currentName) {

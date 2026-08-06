@@ -270,7 +270,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     final settings = context.watch<SettingsService>();
     final provider = context.watch<TaskProvider>();
     final unresolvedProblemCount = provider.problems
-        .where((problem) => problem.status != 'resolved')
+        .where((problem) => problem.status == 'open' || problem.status == 'assigned')
         .length;
 
     return Scaffold(

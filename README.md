@@ -367,3 +367,13 @@ All strings go through `settings.t(key)` — add a new language by adding a map 
 [Report Bug](https://github.com/DALI951/task-tracker/issues) · [Request Feature](https://github.com/DALI951/task-tracker/issues)
 
 </div>
+# Upload behavior
+
+Task proof and problem photos use a bounded, sequential upload queue (maximum
+50 photos). The queue publishes completed/total progress through
+`TaskProvider`, and the Firestore submission is written only after every photo
+has uploaded, so manager actions cannot run against a partial submission. The
+queue continues while the app is navigating between screens. It is deliberately
+not a process-level Android background service: if the OS force-stops the app,
+the in-memory photo bytes are lost and the employee can retry. This avoids the
+foreground-service launch crash from the historical v0.4.8 implementation.

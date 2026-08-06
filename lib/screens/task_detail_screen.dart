@@ -31,6 +31,20 @@ class TaskDetailScreen extends StatefulWidget {
 
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
   bool _uploading = false;
+  final List<Uint8List> _proofPhotos = [];
+  late final TextEditingController _completionDescCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _completionDescCtrl = TextEditingController(text: widget.task.completionDescription ?? '');
+  }
+
+  @override
+  void dispose() {
+    _completionDescCtrl.dispose();
+    super.dispose();
+  }
 
   String t(String key) => context.read<SettingsService>().t(key);
 
@@ -47,7 +61,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (ok && mounted) Navigator.pop(context);
   }
 
-  Future<void> _pickAndSubmitProof() async {
+  Future<void> _pickProofPhoto() async {
     final picker = ImagePicker();
     final maxDim = await pickerMaxDimension();
     final picked = await picker.pickImage(
@@ -59,22 +73,24 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
     if (picked == null) return;
 
+    if (_proofPhotos.length >= 50) return;
+    final bytes = await picked.readAsBytes();
+    if (mounted) setState(() => _proofPhotos.add(bytes));
+  }
+
+  Future<void> _submitProof() async {
+    if (_proofPhotos.isEmpty && _completionDescCtrl.text.trim().isEmpty) {
+      toast(context, 'Add a photo or enter a description', error: true);
+      return;
+    }
     setState(() => _uploading = true);
     try {
-      final user = AuthService().currentUser;
-      if (user == null) return;
-
-      if (!mounted) return;
-      final bytes = await picked.readAsBytes();
-      if (!mounted) return;
       final ok = await context.read<TaskProvider>().completeTaskWithProof(
-            taskId: widget.task.id,
-            imageBytes: bytes,
-          );
-      if (mounted) {
-        toast(context, ok ? t('task_completed') : context.read<TaskProvider>().error ?? t('failed'),
-            error: !ok);
-      }
+        taskId: widget.task.id,
+        images: _proofPhotos,
+        completionDescription: _completionDescCtrl.text.trim().isEmpty ? null : _completionDescCtrl.text.trim(),
+      );
+      if (mounted) toast(context, ok ? t('task_completed') : context.read<TaskProvider>().error ?? t('failed'), error: !ok);
     } catch (e) {
       if (mounted) toast(context, friendlyError(e), error: true);
     } finally {
@@ -122,6 +138,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         error: !ok);
   }
 
+  Future<void> _withdrawSubmission() async {
+    final ok = await context.read<TaskProvider>().withdrawTaskSubmission(widget.task.id);
+    if (mounted) toast(context, ok ? t('saved') : context.read<TaskProvider>().error ?? t('failed'), error: !ok);
+  }
+
   Future<void> _rejectWithReason() async {
     final reasonCtrl = TextEditingController();
     final reason = await showDialog<String>(
@@ -131,7 +152,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         content: TextField(
           controller: reasonCtrl,
           decoration: InputDecoration(
-            hintText: t('reject_reason_hint'),
+             hintText: 'Explain what needs fixing. You can reference photo numbers, for example: photos 2 and 4.',
             border: const OutlineInputBorder(),
           ),
           maxLines: 2,
@@ -476,22 +497,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ],
               ),
             ),
-            if (task.photoUrl != null) ...[
+            if (task.photoUrls.isNotEmpty) ...[
               const SizedBox(height: 20),
               Text(t('proof_photo'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600, color: cs.onSurface)),
               const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _showPhotoGallery,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(Brand.radiusMd),
-                  child: StorageService.isRemotePhoto(task.photoUrl!)
-                      ? Image.network(
-                          task.photoUrl!,
-                          width: double.infinity,
-                          height: 250,
-                          fit: BoxFit.cover,
+               Wrap(
+                 spacing: 8,
+                 runSpacing: 8,
+                 children: task.photoUrls.asMap().entries.map((entry) => Stack(
+                   children: [
+                     ClipRRect(
+                   borderRadius: BorderRadius.circular(Brand.radiusMd),
+                   child: StorageService.isRemotePhoto(entry.value)
+                       ? Image.network(entry.value, width: 150, height: 150,
+                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
                             height: 200,
                             color: cs.surfaceContainerHighest,
@@ -500,10 +521,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                     size: 48, color: cs.outline)),
                           ),
                         )
-                      : Image.memory(
-                          base64Decode(task.photoUrl!),
-                          width: double.infinity,
-                          height: 250,
+                       : Image.memory(base64Decode(entry.value), width: 150, height: 150,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
                             height: 200,
@@ -513,11 +531,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                     size: 48, color: cs.outline)),
                           ),
                         ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(t('tap_to_zoom'),
-                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                     ),
+                     PositionedDirectional(top: 4, start: 4, child: CircleAvatar(radius: 12, child: Text('${entry.key + 1}'))),
+                   ],
+                 )).toList(),
+               ),
+               if (task.completionDescription != null) Padding(
+                 padding: const EdgeInsets.only(top: 8),
+                 child: Text(task.completionDescription!, style: TextStyle(color: cs.onSurfaceVariant)),
+               ),
             ],
             if (task.history.isNotEmpty) ...[
               const SizedBox(height: 20),
@@ -553,19 +575,41 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
               ),
             if (canComplete)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _uploading ? null : _pickAndSubmitProof,
+              Column(children: [
+                Consumer<TaskProvider>(
+                  builder: (_, provider, __) => provider.uploadingPhotos
+                      ? Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(children: [
+                            Expanded(child: LinearProgressIndicator(
+                              value: provider.uploadTotal == 0
+                                  ? null
+                                  : provider.uploadCompleted / provider.uploadTotal,
+                            )),
+                            const SizedBox(width: 8),
+                            Text('${provider.uploadCompleted}/${provider.uploadTotal}'),
+                          ]),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                TextField(controller: _completionDescCtrl, maxLines: 2,
+                  decoration: InputDecoration(labelText: '${t('description')} (optional with photos)', border: const OutlineInputBorder())),
+                const SizedBox(height: 8),
+                if (_proofPhotos.isNotEmpty) _proofPhotoEditor(),
+                Row(children: [
+                  Expanded(child: OutlinedButton.icon(onPressed: _uploading || _proofPhotos.length >= 50 ? null : _pickProofPhoto,
+                    icon: const Icon(Icons.add_photo_alternate), label: Text('Photos (${_proofPhotos.length}/50)'))),
+                  const SizedBox(width: 8),
+                  Expanded(child: ElevatedButton.icon(onPressed: _uploading ? null : _submitProof,
                   icon: _uploading
                       ? const SizedBox(
                           width: 20, height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.camera_alt),
-                  label: Text(_uploading ? t('uploading') : t('complete_with_photo')),
-                ),
-              ),
+                  label: Text(_uploading ? t('uploading') : t('send')))),
+                ]),
+              ]),
             if (canCompleteAsManager && !task.isCompleted)
               SizedBox(
                 width: double.infinity,
@@ -588,7 +632,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     child: SizedBox(
                       height: 48,
                       child: ElevatedButton.icon(
-                        onPressed: _approveTask,
+                         onPressed: task.uploadsComplete ? _approveTask : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Brand.done,
                           foregroundColor: Colors.white,
@@ -603,7 +647,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     child: SizedBox(
                       height: 48,
                       child: OutlinedButton.icon(
-                        onPressed: _rejectWithReason,
+                         onPressed: task.uploadsComplete ? _rejectWithReason : null,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Brand.problem,
                           side: BorderSide(color: Brand.problem.withAlpha(100)),
@@ -616,6 +660,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ],
               ),
             ],
+            if (!widget.isManager && task.isPendingReview)
+              OutlinedButton.icon(onPressed: _withdrawSubmission, icon: const Icon(Icons.undo), label: const Text('Withdraw submission')),
             if (widget.isManager && !task.isCompleted && !task.isPendingReview)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -683,6 +729,28 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       ],
     );
   }
+
+  Widget _proofPhotoEditor() => SizedBox(
+    height: 84,
+    child: ReorderableListView.builder(
+      scrollDirection: Axis.horizontal,
+      itemCount: _proofPhotos.length,
+      onReorder: (oldIndex, newIndex) => setState(() {
+        if (newIndex > oldIndex) newIndex--;
+        final photo = _proofPhotos.removeAt(oldIndex);
+        _proofPhotos.insert(newIndex, photo);
+      }),
+      itemBuilder: (_, i) => Padding(
+        key: ValueKey(_proofPhotos[i]),
+        padding: const EdgeInsetsDirectional.only(end: 8),
+        child: Stack(children: [
+          Image.memory(_proofPhotos[i], width: 84, height: 84, fit: BoxFit.cover),
+          PositionedDirectional(top: 0, end: 0, child: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => setState(() => _proofPhotos.removeAt(i)))),
+          PositionedDirectional(bottom: 2, start: 2, child: CircleAvatar(radius: 10, child: Text('${i + 1}', style: const TextStyle(fontSize: 11)))),
+        ]),
+      ),
+    ),
+  );
 
   String _historyLabel(String action) {
     switch (action) {

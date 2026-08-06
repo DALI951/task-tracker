@@ -41,7 +41,13 @@ service cloud.firestore {
 
       // Managers: read/update/delete their own tasks
       allow read, update, delete: if isAuth() && isManager(request.auth.uid)
-        && resource.data.createdBy == userEmail();
+        && resource.data.createdBy == userEmail()
+        // A review may only be approved after the employee's complete upload
+        // has been recorded. Legacy tasks without the flag stay protected.
+        && (!(
+          resource.data.status == 'pending_review' &&
+          request.resource.data.status == 'completed'
+        ) || request.resource.data.uploadsComplete == true);
 
       // Employees: read tasks assigned to their email
       allow read: if isAuth() &&
@@ -50,9 +56,15 @@ service cloud.firestore {
       // Employees: claim / complete / reset their own tasks
       allow update: if isAuth() &&
         resource.data.assignedToEmail == userEmail() &&
+        resource.data.status != 'completed' &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'claimedBy', 'claimedByName', 'photoUrl', 'history',
-                    'rejectionReason', 'completedAt', 'startedAt']);
+                    'photoUrls', 'completionDescription', 'uploadsComplete',
+                    'uploadCompleted', 'uploadTotal',
+                    'rejectionReason', 'completedAt', 'startedAt'])
+        // Employees cannot submit a review state while uploads are partial.
+        && (request.resource.data.status != 'pending_review' ||
+            request.resource.data.uploadsComplete == true);
     }
 
     // ─── Employees (manager directory) ────────────────────────

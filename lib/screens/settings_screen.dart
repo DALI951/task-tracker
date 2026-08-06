@@ -11,7 +11,6 @@ import 'package:task_tracker/screens/notification_preferences_screen.dart';
 import 'package:task_tracker/screens/preset_items_screen.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
-import 'package:task_tracker/screens/whats_new_screen.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -209,15 +208,6 @@ class SettingsScreen extends StatelessWidget {
                 Uri.parse('https://dali951.github.io/task-tracker/'),
               ),
             ),
-          ListTile(
-            leading: const Icon(Icons.new_releases_outlined),
-            title: const Text("What's New"),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const WhatsNewScreen()),
-            ),
-          ),
           const SizedBox(height: 24),
           Center(
             child: Text(

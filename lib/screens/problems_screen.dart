@@ -17,13 +17,9 @@ class ProblemsScreen extends StatefulWidget {
 }
 
 class _ProblemsScreenState extends State<ProblemsScreen> {
-  String _filter = 'unsolved';
+  String _filter = 'open';
 
   List<Problem> _filtered(List<Problem> all) {
-    if (_filter == 'all') return all;
-    if (_filter == 'unsolved') {
-      return all.where((p) => p.status != 'resolved').toList();
-    }
     return all.where((p) => p.status == _filter).toList();
   }
 
@@ -45,16 +41,10 @@ class _ProblemsScreenState extends State<ProblemsScreen> {
                     value: _filter,
                     isDense: true,
                     items: [
-                      DropdownMenuItem(
-                        value: 'unsolved',
-                        child: Text(t('filter_unsolved')),
-                      ),
-                      DropdownMenuItem(value: 'open', child: Text(t('filter_open'))),
-                      DropdownMenuItem(value: 'all', child: Text(t('filter_all'))),
-                      DropdownMenuItem(value: 'assigned', child: Text(t('filter_assigned'))),
-                      DropdownMenuItem(value: 'resolved', child: Text(t('filter_resolved'))),
+                       DropdownMenuItem(value: 'open', child: Text(t('filter_open'))),
+                       DropdownMenuItem(value: 'assigned', child: Text(t('filter_assigned'))),
                     ],
-                    onChanged: (v) => setState(() => _filter = v ?? 'unsolved'),
+                     onChanged: (v) => setState(() => _filter = v ?? 'open'),
                   ),
                 ),
               ],
@@ -192,35 +182,26 @@ class _ProblemCard extends StatelessWidget {
                 ],
               ),
             ],
-            if (problem.photoUrl != null) ...[
+            if (problem.assignedToName != null) ...[
+              const SizedBox(height: 6),
+              Text('${t('assigned_to')}: ${problem.assignedToName}',
+                  style: TextStyle(color: Brand.doing, fontWeight: FontWeight.w600)),
+            ],
+            if (problem.photoUrls.isNotEmpty) ...[
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(Brand.radiusSm),
-                child: StorageService.isRemotePhoto(problem.photoUrl!)
-                    ? Image.network(
-                        problem.photoUrl!,
-                        width: double.infinity,
-                        height: 160,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          height: 80,
-                          color: cs.surfaceContainerHighest,
-                          child:
-                              Center(child: Icon(Icons.broken_image, color: cs.outline)),
-                        ),
-                      )
-                    : Image.memory(
-                        base64Decode(problem.photoUrl!),
-                        width: double.infinity,
-                        height: 160,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          height: 80,
-                          color: cs.surfaceContainerHighest,
-                          child:
-                              Center(child: Icon(Icons.broken_image, color: cs.outline)),
-                        ),
-                      ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: problem.photoUrls.asMap().entries.map((entry) {
+                  final photo = entry.value;
+                  final image = StorageService.isRemotePhoto(photo)
+                      ? Image.network(photo, width: 120, height: 120, fit: BoxFit.cover)
+                      : Image.memory(base64Decode(photo), width: 120, height: 120, fit: BoxFit.cover);
+                  return Stack(children: [
+                    ClipRRect(borderRadius: BorderRadius.circular(Brand.radiusSm), child: image),
+                    PositionedDirectional(top: 3, start: 3, child: CircleAvatar(radius: 11, child: Text('${entry.key + 1}'))),
+                  ]);
+                }).toList(),
               ),
             ],
             if (problem.isOpen)
@@ -238,10 +219,10 @@ class _ProblemCard extends StatelessWidget {
             if (problem.convertedToTaskId != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  problem.isAssigned
-                      ? '${t('filter_assigned')} →'
-                      : '${t('resolved')} ✓',
+                   child: Text(
+                     problem.isAssigned
+                         ? '${t('filter_assigned')} →'
+                         : '${t('resolved')} ✓',
                   style: TextStyle(
                       color: problem.isAssigned ? Brand.doing : Brand.done,
                       fontSize: 12,
@@ -303,13 +284,10 @@ class _ProblemCard extends StatelessWidget {
               ElevatedButton(
                 onPressed: () async {
                   if (selectedEmail == null) return;
-                  final newTaskId = await provider.addTask(
-                    title: problem.description.split('\n').first,
-                    description: problem.description,
-                    assignedTo: selectedName ?? selectedEmail!,
-                    assignedToEmail: selectedEmail!,
-                    customer: null,
-                    carOrThing: problem.carOrThing,
+                  final newTaskId = await provider.convertProblemToTask(
+                    problem: problem,
+                    employeeName: selectedName ?? selectedEmail!,
+                    employeeEmail: selectedEmail!,
                   );
                   if (newTaskId == null) {
                     if (ctx.mounted) {
@@ -317,13 +295,6 @@ class _ProblemCard extends StatelessWidget {
                           error: true);
                     }
                     return;
-                  }
-                  final resolved =
-                      await provider.resolveProblem(problem.id, newTaskId);
-                  if (!resolved && ctx.mounted) {
-                    toast(ctx,
-                        provider.error ?? 'Failed to update the problem',
-                        error: true);
                   }
                   if (ctx.mounted) Navigator.pop(ctx);
                 },

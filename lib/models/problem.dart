@@ -4,6 +4,8 @@ class Problem {
   final String reporterName;
   final String description;
   final String? photoUrl;
+  final List<String> photoUrls;
+  final String? assignedToName;
   final String? carOrThing;
   final DateTime createdAt;
   final String status;
@@ -15,6 +17,8 @@ class Problem {
     required this.reporterName,
     required this.description,
     this.photoUrl,
+    this.photoUrls = const [],
+    this.assignedToName,
     this.carOrThing,
     required this.createdAt,
     this.status = 'open',
@@ -32,6 +36,9 @@ class Problem {
       reporterName: map['reporterName'] as String? ?? '',
       description: map['description'] as String? ?? '',
       photoUrl: map['photoUrl'] as String?,
+      photoUrls: (map['photoUrls'] as List<dynamic>?)?.cast<String>() ??
+          (map['photoUrl'] is String ? [map['photoUrl'] as String] : const []),
+      assignedToName: map['assignedToName'] as String?,
       carOrThing: map['carOrThing'] as String?,
       createdAt: (map['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
       status: map['status'] as String? ?? 'open',
@@ -45,6 +52,8 @@ class Problem {
       'reporterName': reporterName,
       'description': description,
       'photoUrl': photoUrl,
+      'photoUrls': photoUrls,
+      'assignedToName': assignedToName,
       'carOrThing': carOrThing,
       'createdAt': createdAt,
       'status': status,
