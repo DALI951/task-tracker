@@ -17,10 +17,13 @@ class ProblemsScreen extends StatefulWidget {
 }
 
 class _ProblemsScreenState extends State<ProblemsScreen> {
-  String _filter = 'open';
+  String _filter = 'unsolved';
 
   List<Problem> _filtered(List<Problem> all) {
     if (_filter == 'all') return all;
+    if (_filter == 'unsolved') {
+      return all.where((p) => p.status != 'resolved').toList();
+    }
     return all.where((p) => p.status == _filter).toList();
   }
 
@@ -42,12 +45,16 @@ class _ProblemsScreenState extends State<ProblemsScreen> {
                     value: _filter,
                     isDense: true,
                     items: [
+                      DropdownMenuItem(
+                        value: 'unsolved',
+                        child: Text(t('filter_unsolved')),
+                      ),
                       DropdownMenuItem(value: 'open', child: Text(t('filter_open'))),
                       DropdownMenuItem(value: 'all', child: Text(t('filter_all'))),
                       DropdownMenuItem(value: 'assigned', child: Text(t('filter_assigned'))),
                       DropdownMenuItem(value: 'resolved', child: Text(t('filter_resolved'))),
                     ],
-                    onChanged: (v) => setState(() => _filter = v ?? 'open'),
+                    onChanged: (v) => setState(() => _filter = v ?? 'unsolved'),
                   ),
                 ),
               ],

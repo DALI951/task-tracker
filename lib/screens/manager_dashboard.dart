@@ -269,6 +269,9 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     final auth = AuthService();
     final settings = context.watch<SettingsService>();
     final provider = context.watch<TaskProvider>();
+    final unresolvedProblemCount = provider.problems
+        .where((problem) => problem.status != 'resolved')
+        .length;
 
     return Scaffold(
       appBar: AppBar(
@@ -336,7 +339,41 @@ class _ManagerDashboardState extends State<ManagerDashboard>
           controller: _tabController,
           tabs: [
             Tab(text: settings.t('tasks_tab')),
-            Tab(text: settings.t('problems_tab')),
+            Tab(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Text(settings.t('problems_tab')),
+                  if (unresolvedProblemCount > 0)
+                    PositionedDirectional(
+                      top: -8,
+                      start: -16,
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 18),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Brand.problem,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          unresolvedProblemCount > 99
+                              ? '99+'
+                              : '$unresolvedProblemCount',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

@@ -141,12 +141,21 @@ class NotificationService {
     Map<String, String>? data,
   }) async {
     try {
-      final usersSnap = await _db
+      final currentUser = FirebaseAuth.instance.currentUser;
+      var usersQuery = _db
           .collection('users')
-          .where('email', isEqualTo: recipientEmail)
-          .where('role', isEqualTo: 'manager')
-          .limit(1)
-          .get();
+          .where('email', isEqualTo: recipientEmail);
+
+      if (currentUser != null) {
+        final senderDoc =
+            await _db.collection('users').doc(currentUser.uid).get();
+        final senderRole = senderDoc.data()?['role'] as String?;
+        if (senderRole != 'manager') {
+          usersQuery = usersQuery.where('role', isEqualTo: 'manager');
+        }
+      }
+
+      final usersSnap = await usersQuery.limit(1).get();
       if (usersSnap.docs.isEmpty) {
         debugPrint('[Notif] No user doc found for $recipientEmail');
         return const FcmSendResult.failure(stage: 'user_lookup_empty');
