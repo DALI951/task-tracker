@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:task_tracker/models/app_notification.dart';
@@ -80,7 +81,7 @@ class NotificationService {
     final prefs = await getPrefs(recipientEmail);
     if (prefs[type] == false) return;
 
-    await _ref.add({
+    final notificationRef = await _ref.add({
       'recipientEmail': recipientEmail,
       'type': type,
       'title': title,
@@ -91,15 +92,49 @@ class NotificationService {
       'relatedId': relatedId,
     });
 
-    unawaited(_sendFcmPush(
+    unawaited(_sendAndRecordPush(
+      notificationId: notificationRef.id,
       recipientEmail: recipientEmail,
+      type: type,
       title: title,
       body: message,
       data: {'type': type, if (relatedId != null) 'relatedId': relatedId},
     ));
   }
 
-  Future<void> _sendFcmPush({
+  Future<void> _sendAndRecordPush({
+    required String notificationId,
+    required String recipientEmail,
+    required String type,
+    required String title,
+    required String body,
+    Map<String, String>? data,
+  }) async {
+    final result = await _sendFcmPush(
+      recipientEmail: recipientEmail,
+      title: title,
+      body: body,
+      data: data,
+    );
+
+    try {
+      await _db.collection('push_diagnostics').add({
+        'notificationId': notificationId,
+        'senderEmail': FirebaseAuth.instance.currentUser?.email ?? '',
+        'recipientEmail': recipientEmail,
+        'type': type,
+        'ok': result.ok,
+        'stage': result.stage,
+        'statusCode': result.statusCode,
+        'detail': _diagnosticDetail(result.detail),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('[Notif] Could not write push diagnostic: $e');
+    }
+  }
+
+  Future<FcmSendResult> _sendFcmPush({
     required String recipientEmail,
     required String title,
     required String body,
@@ -113,16 +148,16 @@ class NotificationService {
           .get();
       if (usersSnap.docs.isEmpty) {
         debugPrint('[Notif] No user doc found for $recipientEmail');
-        return;
+        return const FcmSendResult.failure(stage: 'user_lookup_empty');
       }
 
       final fcmToken = usersSnap.docs.first.data()['fcmToken'] as String?;
       if (fcmToken == null || fcmToken.isEmpty) {
         debugPrint('[Notif] No fcmToken for $recipientEmail');
-        return;
+        return const FcmSendResult.failure(stage: 'token_missing');
       }
 
-      await FcmSender().sendPush(
+      return FcmSender().sendPush(
         token: fcmToken,
         title: title,
         body: body,
@@ -130,7 +165,16 @@ class NotificationService {
       );
     } catch (e) {
       debugPrint('[Notif] _sendFcmPush error: $e');
+      return FcmSendResult.failure(
+        stage: 'user_lookup_error',
+        detail: e.toString(),
+      );
     }
+  }
+
+  String? _diagnosticDetail(String? detail) {
+    if (detail == null || detail.isEmpty) return null;
+    return detail.length <= 500 ? detail : detail.substring(0, 500);
   }
 
   Stream<QuerySnapshot> streamForUser(String email) {

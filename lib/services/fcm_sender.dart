@@ -12,7 +12,7 @@ class FcmSender {
       'http://modali.powerpme.com/tasktracker/api/send-push.php';
   static const _timeout = Duration(seconds: 10);
 
-  Future<bool> sendPush({
+  Future<FcmSendResult> sendPush({
     required String token,
     required String title,
     required String body,
@@ -36,13 +36,39 @@ class FcmSender {
           .timeout(_timeout);
 
       if (response.statusCode == 200) {
-        return true;
+        return const FcmSendResult.success();
       }
       debugPrint('FCM send failed (${response.statusCode}): ${response.body}');
-      return false;
+      return FcmSendResult.failure(
+        stage: 'relay_http',
+        statusCode: response.statusCode,
+        detail: response.body,
+      );
     } catch (e) {
       debugPrint('FCM send error: $e');
-      return false;
+      return FcmSendResult.failure(
+        stage: 'relay_network',
+        detail: e.toString(),
+      );
     }
   }
+}
+
+class FcmSendResult {
+  final bool ok;
+  final String stage;
+  final int? statusCode;
+  final String? detail;
+
+  const FcmSendResult.success()
+      : ok = true,
+        stage = 'relay_http',
+        statusCode = 200,
+        detail = null;
+
+  const FcmSendResult.failure({
+    required this.stage,
+    this.statusCode,
+    this.detail,
+  }) : ok = false;
 }

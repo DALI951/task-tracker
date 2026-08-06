@@ -123,6 +123,12 @@ service cloud.firestore {
         resource.data.recipientEmail == userEmail();
     }
 
+    // Temporary v0.4.10 push diagnostics. The app writes these records;
+    // investigation reads them with the Firebase service account.
+    match /push_diagnostics/{diagnosticId} {
+      allow create: if isAuth();
+    }
+
     // ─── Invites (manager signup links) ───────────────────────
     // Written/read only by Cloud Functions (Admin SDK) and managers;
     // the invite code itself is the credential for redemption.
