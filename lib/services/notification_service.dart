@@ -144,6 +144,7 @@ class NotificationService {
       final usersSnap = await _db
           .collection('users')
           .where('email', isEqualTo: recipientEmail)
+          .where('role', isEqualTo: 'manager')
           .limit(1)
           .get();
       if (usersSnap.docs.isEmpty) {
