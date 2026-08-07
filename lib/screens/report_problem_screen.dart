@@ -250,13 +250,20 @@ class _ReportStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = context.watch<SettingsService>().t;
     final dateFormat = DateFormat('MMM d, HH:mm');
 
     Color fg;
     IconData icon;
     String label;
+    final uploadStoppedReason =
+        context.watch<TaskProvider>().sessionErrors[problem.id];
     final uploading = problem.isUploading && !problem.uploadsComplete;
-    if (uploading) {
+    if (uploadStoppedReason != null) {
+      fg = Brand.problem;
+      icon = Icons.error_outline;
+      label = t('interrupted');
+    } else if (uploading) {
       fg = Colors.blue.shade700;
       icon = Icons.cloud_upload;
       final pct = problem.uploadProgress == null
@@ -318,6 +325,24 @@ class _ReportStatusCard extends StatelessWidget {
                 dateFormat.format(problem.createdAt),
                 style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
+              if (uploadStoppedReason != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  '$uploadStoppedReason',
+                  style: TextStyle(fontSize: 12, color: Brand.problem),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => context
+                        .read<TaskProvider>()
+                        .retryUpload(problem.id, isProblem: true),
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: Text(t('retry')),
+                  ),
+                ),
+              ],
               if (uploading) ...[
                 const SizedBox(height: 10),
                 ClipRRect(

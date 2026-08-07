@@ -81,10 +81,17 @@ class UpdateDownloadManager extends ChangeNotifier {
       await _ensureWorkerRunning(s);
       _startPolling();
       notifyListeners();
-    } else if (s.state == 'failed') {
+    } else if (s.state == 'paused' || s.state == 'failed') {
+      // Paused: the partial APK is still on disk. Show the paused banner with
+      // Retry, keep polling (the worker may resume by itself when connectivity
+      // returns) and re-enqueue the worker so it can finish automatically.
       _state = UpdateDownloadState.failed;
-      _error = 'download_failed';
+      _error = s.state == 'paused' ? 'download_paused' : 'download_failed';
+      _progress = s.progress;
       _version = s.version;
+      _url = s.url;
+      await _ensureWorkerRunning(s);
+      _startPolling();
       notifyListeners();
     }
   }
@@ -104,7 +111,7 @@ class UpdateDownloadManager extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (s != null && s.state == 'downloading') {
+    if (s != null && (s.state == 'downloading' || s.state == 'paused')) {
       final recovered = _recoverDone(s);
       if (recovered != null) {
         _state = UpdateDownloadState.done;
@@ -115,7 +122,8 @@ class UpdateDownloadManager extends ChangeNotifier {
         return;
       }
       // A worker may already be running: keep (no-op) instead of replace.
-      // If it was killed, the keep registration starts a fresh one.
+      // If it was killed, the keep registration starts a fresh one that
+      // resumes from the bytes already on disk.
       _url = url;
       _version = version;
       _state = UpdateDownloadState.downloading;
@@ -186,9 +194,23 @@ class UpdateDownloadManager extends ChangeNotifier {
     _pollTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _readStateFile().then((s) {
         if (s == null) return;
-        if (s.state == 'downloading' &&
+        if (s.state == 'paused' || (s.state == 'failed' && _state == UpdateDownloadState.failed)) {
+          if (s.state == 'paused') {
+            _state = UpdateDownloadState.failed;
+            _error = 'download_paused';
+          }
+          if (s.progress != null &&
+              (s.progress! - (_progress ?? 0)).abs() >= 0.005) {
+            _progress = s.progress;
+          }
+          notifyListeners();
+        } else if (s.state == 'downloading' &&
             s.progress != null &&
             (s.progress! - (_progress ?? 0)).abs() >= 0.005) {
+          if (_state == UpdateDownloadState.failed) {
+            _state = UpdateDownloadState.downloading;
+            _error = null;
+          }
           _progress = s.progress;
           notifyListeners();
         } else if (s.state == 'done' ||
@@ -216,9 +238,33 @@ class UpdateDownloadManager extends ChangeNotifier {
   }
 
   Future<void> retry() async {
-    final url = _url;
-    final version = _version;
-    if (url == null || version == null) return;
+    final s = await _readStateFile();
+    final url = _url ?? s?.url;
+    final version = _version ?? s?.version;
+    if (url == null || version == null || url.isEmpty || version.isEmpty) return;
+    if (s != null && (s.state == 'paused' || s.state == 'failed')) {
+      // Resume from the bytes already on disk: keep the partial APK, mark the
+      // state downloading and force a fresh worker (replace) so the download
+      // continues where it stopped instead of restarting from 0.
+      await _writeStateFile('downloading', s.progress, s.path, version, url);
+      _state = UpdateDownloadState.downloading;
+      _progress = s.progress;
+      _error = null;
+      _url = url;
+      _version = version;
+      notifyListeners();
+      try {
+        await Workmanager().registerOneOffTask(
+          updateDownloadTaskName,
+          updateDownloadTaskName,
+          inputData: {'url': url, 'version': version},
+          constraints: Constraints(networkType: NetworkType.connected),
+          existingWorkPolicy: ExistingWorkPolicy.replace,
+        );
+      } catch (_) {}
+      _startPolling();
+      return;
+    }
     await start(url, version);
   }
 

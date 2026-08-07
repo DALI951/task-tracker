@@ -73,8 +73,15 @@ class TaskProvider extends ChangeNotifier {
   final Map<String, Timer> _sessionPollers = {};
   final Map<String, void Function(int, int)?> _sessionOnProgress = {};
   final Map<String, void Function(int, int)?> _sessionOnByteProgress = {};
+  final Map<String, void Function(String)?> _sessionOnStopped = {};
   final Map<String, int> _sessionLastProgress = {};
   final Map<String, int> _sessionLastBytes = {};
+
+  /// docId (task or problem) -> human-readable reason when a background
+  /// upload stopped. Cleared when the upload is retried or completes.
+  final Map<String, String> _sessionErrors = {};
+
+  Map<String, String> get sessionErrors => Map.unmodifiable(_sessionErrors);
 
   bool _lastUploadCancelled = false;
   bool get lastUploadCancelled => _lastUploadCancelled;
@@ -521,6 +528,7 @@ class TaskProvider extends ChangeNotifier {
     bool approveDirectly = false,
     void Function(int completed, int total)? onProgress,
     void Function(int bytesSent, int totalBytes)? onByteProgress,
+    void Function(String reason)? onStopped,
   }) async {
     final photoUrls = <String>[];
     _cancelledTaskIds.remove(taskId);
@@ -589,6 +597,7 @@ class TaskProvider extends ChangeNotifier {
             current: current,
             onProgress: onProgress,
             onByteProgress: onByteProgress,
+            onStopped: onStopped,
           );
         }
       }
@@ -689,6 +698,7 @@ class TaskProvider extends ChangeNotifier {
     required AppTask? current,
     void Function(int completed, int total)? onProgress,
     void Function(int bytesSent, int totalBytes)? onByteProgress,
+    void Function(String reason)? onStopped,
   }) async {
     final taskTitle = current?.title ?? '';
     final createdBy = current?.createdBy ?? '';
@@ -719,6 +729,7 @@ class TaskProvider extends ChangeNotifier {
     );
     _sessionOnProgress[sessionId] = onProgress;
     _sessionOnByteProgress[sessionId] = onByteProgress;
+    _sessionOnStopped[sessionId] = onStopped;
     await Workmanager().registerOneOffTask(
       'bg-upload-$sessionId',
       uploadTaskName,
@@ -818,9 +829,37 @@ class TaskProvider extends ChangeNotifier {
           _stopSessionPoller(session.sessionId);
           _sessionOnProgress.remove(session.sessionId);
           _sessionOnByteProgress.remove(session.sessionId);
+          _sessionOnStopped.remove(session.sessionId);
+          _sessionErrors.remove(taskId);
+          notifyListeners();
         }
       }());
     }
+  }
+
+  /// Retries a stopped background upload (task proof or problem photos):
+  /// re-enqueues the worker for the SAME session, so photos that were already
+  /// uploaded keep their 'done' flag and are NOT re-uploaded.
+  Future<void> retryUpload(String docId, {required bool isProblem}) async {
+    final session = isProblem
+        ? await UploadSessionService.findByProblemId(docId)
+        : await UploadSessionService.findByTaskId(docId);
+    if (session == null || session.finalApplied) return;
+    if (session.status == 'done' || session.status == 'cancelled') return;
+    await UploadSessionService.write(
+        session.copyWith(status: 'uploading', error: ''));
+    _sessionErrors.remove(docId);
+    notifyListeners();
+    try {
+      await Workmanager().registerOneOffTask(
+        session.uniqueName,
+        uploadTaskName,
+        inputData: {'sessionId': session.sessionId},
+        constraints: Constraints(networkType: NetworkType.connected),
+        existingWorkPolicy: ExistingWorkPolicy.replace,
+      );
+    } catch (_) {}
+    _startSessionPoller(session.sessionId);
   }
 
   /// Polls a background upload session's state file so in-app progress bars
@@ -852,6 +891,16 @@ class TaskProvider extends ChangeNotifier {
           _stopSessionPoller(sessionId);
           _sessionOnProgress.remove(sessionId);
           _sessionOnByteProgress.remove(sessionId);
+          final onStopped = _sessionOnStopped.remove(sessionId);
+          if (session.status == 'failed') {
+            _sessionErrors[session.docId] = session.error.isEmpty
+                ? '${_t('upload_error_generic')}'
+                : session.error;
+            onStopped?.call(_sessionErrors[session.docId]!);
+          } else {
+            _sessionErrors.remove(session.docId);
+          }
+          notifyListeners();
           if (session.finalApplied) {
             UploadSessionService.delete(sessionId);
           }
@@ -1067,6 +1116,7 @@ class TaskProvider extends ChangeNotifier {
     String? carOrThing,
     void Function(int completed, int total)? onProgress,
     void Function(int bytesSent, int totalBytes)? onByteProgress,
+    void Function(String reason)? onStopped,
   }) async {
     String? problemId;
     try {
@@ -1145,6 +1195,7 @@ class TaskProvider extends ChangeNotifier {
           );
           _sessionOnProgress[sessionId] = onProgress;
           _sessionOnByteProgress[sessionId] = onByteProgress;
+          _sessionOnStopped[sessionId] = onStopped;
           await Workmanager().registerOneOffTask(
             'bg-upload-$sessionId',
             uploadTaskName,

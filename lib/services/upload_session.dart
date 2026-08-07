@@ -72,6 +72,7 @@ class UploadSession {
   final String historyBy;
 
   String status; // uploading | done | cancelled | failed
+  String error; // human-readable reason when status == 'failed' (localized)
   bool finalApplied;
   bool pendingApply;
   int bytesSent;
@@ -104,6 +105,7 @@ class UploadSession {
     this.historyAction = '',
     this.historyBy = '',
     this.status = 'uploading',
+    this.error = '',
     this.finalApplied = false,
     this.pendingApply = false,
     this.bytesSent = 0,
@@ -141,6 +143,7 @@ class UploadSession {
         'historyAction': historyAction,
         'historyBy': historyBy,
         'status': status,
+        'error': error,
         'finalApplied': finalApplied,
         'pendingApply': pendingApply,
         'bytesSent': bytesSent,
@@ -176,6 +179,7 @@ class UploadSession {
         historyAction: map['historyAction'] as String? ?? '',
         historyBy: map['historyBy'] as String? ?? '',
         status: map['status'] as String? ?? 'uploading',
+        error: map['error'] as String? ?? '',
         finalApplied: map['finalApplied'] as bool? ?? false,
         pendingApply: map['pendingApply'] as bool? ?? false,
         bytesSent: map['bytesSent'] as int? ?? 0,
@@ -186,6 +190,7 @@ class UploadSession {
 
   UploadSession copyWith({
     String? status,
+    String? error,
     bool? finalApplied,
     bool? pendingApply,
     int? bytesSent,
@@ -217,6 +222,7 @@ class UploadSession {
         historyAction: historyAction,
         historyBy: historyBy,
         status: status ?? this.status,
+        error: error ?? this.error,
         finalApplied: finalApplied ?? this.finalApplied,
         pendingApply: pendingApply ?? this.pendingApply,
         bytesSent: bytesSent ?? this.bytesSent,

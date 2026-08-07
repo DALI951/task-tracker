@@ -101,55 +101,73 @@ Future<bool> _runUploadTask(String sessionId) async {
   await _showUploadProgress(notifId, session, done, doneBytes, force: true);
 
   final sessionDir = await UploadSessionService.dir(sessionId);
-  for (var i = 0; i < session.photos.length; i++) {
-    final photo = session.photos[i];
-    if (photo.done) continue;
+  try {
+    for (var i = 0; i < session.photos.length; i++) {
+      final photo = session.photos[i];
+      if (photo.done) continue;
 
-    // The user may have pressed Stop while this worker ran.
+      // The user may have pressed Stop while this worker ran.
+      final latest = await UploadSessionService.read(sessionId);
+      if (latest == null ||
+          latest.status == 'cancelled' ||
+          latest.finalApplied) {
+        return true;
+      }
+
+      final path = '${sessionDir.path}/${photo.file}';
+      if (!File(path).existsSync()) {
+        await _markFailed(sessionId);
+        return false;
+      }
+      final bytes = File(path).readAsBytesSync();
+
+      final url = await StorageService().uploadImageChunked(
+        bytes,
+        '${session.type == 'task_completion' ? 'task_photos' : 'problem_photos'}/$sessionId/photo_${i + 1}_${session.createdAt.millisecondsSinceEpoch}.jpg',
+        onChunkProgress: (received, total) {
+          doneBytes = session.bytesSent + received;
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - lastByteNotify > 700) {
+            lastByteNotify = now;
+            unawaited(_showUploadProgress(
+                notifId, session, done, doneBytes));
+          }
+        },
+      );
+
+      photo.url = url;
+      photo.done = true;
+      done++;
+      doneBytes += bytes.length;
+      final updated = session.copyWith(bytesSent: doneBytes, photos: [
+        for (var j = 0; j < session.photos.length; j++)
+          if (j == i)
+            SessionPhoto(
+                file: photo.file, bytes: photo.bytes, url: url, done: true)
+          else
+            session.photos[j],
+      ]);
+      await UploadSessionService.write(updated);
+
+      unawaited(_updateDocProgress(updated, done));
+      await _showUploadProgress(notifId, updated, done, doneBytes, force: true);
+    }
+  } catch (e) {
+    // Network or server failure: mark the session 'failed' with a readable
+    // reason so the app can tell the employee and offer Retry. Photos that
+    // were already uploaded keep their 'done' flag, so Retry continues from
+    // where the upload stopped instead of starting over.
     final latest = await UploadSessionService.read(sessionId);
     if (latest == null ||
         latest.status == 'cancelled' ||
         latest.finalApplied) {
       return true;
     }
-
-    final path = '${sessionDir.path}/${photo.file}';
-    if (!File(path).existsSync()) {
-      await _markFailed(sessionId);
-      return false;
-    }
-    final bytes = File(path).readAsBytesSync();
-
-    final url = await StorageService().uploadImageChunked(
-      bytes,
-      '${session.type == 'task_completion' ? 'task_photos' : 'problem_photos'}/$sessionId/photo_${i + 1}_${session.createdAt.millisecondsSinceEpoch}.jpg',
-      onChunkProgress: (received, total) {
-        doneBytes = session.bytesSent + received;
-        final now = DateTime.now().millisecondsSinceEpoch;
-        if (now - lastByteNotify > 700) {
-          lastByteNotify = now;
-          unawaited(_showUploadProgress(
-              notifId, session, done, doneBytes));
-        }
-      },
-    );
-
-    photo.url = url;
-    photo.done = true;
-    done++;
-    doneBytes += bytes.length;
-    final updated = session.copyWith(bytesSent: doneBytes, photos: [
-      for (var j = 0; j < session.photos.length; j++)
-        if (j == i)
-          SessionPhoto(
-              file: photo.file, bytes: photo.bytes, url: url, done: true)
-        else
-          session.photos[j],
-    ]);
-    await UploadSessionService.write(updated);
-
-    unawaited(_updateDocProgress(updated, done));
-    await _showUploadProgress(notifId, updated, done, doneBytes, force: true);
+    final s = await _getSettings();
+    final reason = _uploadErrorReason(s, e);
+    await UploadSessionService.write(latest.copyWith(status: 'failed', error: reason));
+    await _showUploadFailed(notifId, latest, reason, s);
+    return true;
   }
 
   final completed = await UploadSessionService.read(sessionId);
@@ -256,6 +274,49 @@ String _shorten(String? s, int max) {
   return '${trimmed.substring(0, max - 1)}…';
 }
 
+/// Maps an upload exception to a human-readable, already-localized reason
+/// stored on the session so the app can show exactly why the upload stopped.
+String _uploadErrorReason(SettingsService s, Object e) {
+  if (e is DioException) {
+    switch (e.type) {
+      case DioExceptionType.connectionError:
+        return s.t('upload_error_no_internet');
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return s.t('upload_error_timeout');
+      case DioExceptionType.badResponse:
+        return '${s.t('upload_error_server')} (${e.response?.statusCode ?? '?'})';
+      default:
+        return s.t('upload_error_generic');
+    }
+  }
+  return s.t('upload_error_generic');
+}
+
+/// Replaces the progress notification with a red "Upload stopped" one that
+/// states the reason.
+Future<void> _showUploadFailed(
+    int notifId, UploadSession session, String reason, SettingsService s) async {
+  final details = AndroidNotificationDetails(
+    _channelId,
+    _channelName,
+    channelDescription: _channelDescription,
+    importance: Importance.high,
+    priority: Priority.high,
+  );
+  await _notifications().show(
+    notifId,
+    s.t('upload_stopped_title'),
+    reason,
+    NotificationDetails(android: details),
+    payload: json.encode({
+      'type': session.type == 'task_completion' ? 'task_upload' : 'problem_upload',
+      'relatedId': session.docId,
+    }),
+  );
+}
+
 /// Transforms the progress notification in place into a completion one.
 Future<void> _showCompletionNotification(
     int notifId, UploadSession session) async {
@@ -294,49 +355,128 @@ Future<bool> _runUpdateDownloadTask(Map<String, dynamic>? inputData) async {
   final version = inputData?['version'] as String?;
   if (url == null || version == null) return true;
   await _ensureChannel();
+  final s = await _getSettings();
 
   final dir = await getApplicationDocumentsDirectory();
   final path = '${dir.path}/Task-Tracker-v$version.apk';
   final file = File(path);
-  if (file.existsSync()) {
-    try {
-      file.deleteSync();
-    } catch (_) {}
-  }
 
-  await _writeUpdateState('downloading', 0, path, version, url);
-  await _showDownloadProgress(0);
+  // Resume like a torrent: keep whatever bytes are already on disk and ask
+  // the server for the rest (HTTP Range). A killed/errored download never
+  // restarts from 0.
+  var startBytes = file.existsSync() ? file.lengthSync() : 0;
 
   var lastNotify = 0.0;
   var lastWrite = 0.0;
+  var absoluteProgress = startBytes > 0 ? 0.0 : null;
+  var absoluteTotal = 0;
+  var received = startBytes;
+
+  void pushState(double p) {
+    // Never write p >= 1 as 'downloading': the synchronous 'done' write
+    // below must be the last thing the state file ever sees.
+    if (p < 1 && p - lastWrite >= 0.01) {
+      lastWrite = p;
+      unawaited(_writeUpdateState('downloading', p, path, version, url));
+    }
+    if (p - lastNotify >= 0.02 || p >= 1) {
+      lastNotify = p;
+      unawaited(_showDownloadProgress((p * 100).round()));
+    }
+  }
+
   try {
-    await Dio().download(
+    if (startBytes > 0) {
+      await _writeUpdateState('downloading', null, path, version, url);
+    } else {
+      await _writeUpdateState('downloading', 0, path, version, url);
+      await _showDownloadProgress(0);
+    }
+
+    final response = await Dio().get<ResponseBody>(
       url,
-      path,
-      onReceiveProgress: (received, total) {
-        if (total <= 0) return;
-        final p = received / total;
-        // Never write p >= 1 as 'downloading': the synchronous 'done' write
-        // below must be the last thing the state file ever sees.
-        if (p < 1 && p - lastWrite >= 0.01) {
-          lastWrite = p;
-          unawaited(_writeUpdateState('downloading', p, path, version, url));
-        }
-        if (p - lastNotify >= 0.02 || p >= 1) {
-          lastNotify = p;
-          unawaited(_showDownloadProgress((p * 100).round()));
-        }
-      },
+      options: Options(
+        responseType: ResponseType.stream,
+        followRedirects: true,
+        headers: {if (startBytes > 0) 'range': 'bytes=$startBytes-'},
+        receiveTimeout: const Duration(seconds: 45),
+      ),
     );
+
+    final code = response.statusCode ?? 0;
+    if (code == 416) {
+      // The server says the range starts past the end: file already complete.
+      await _writeUpdateState('done', 1, path, version, url);
+      await _showDownloadReady(version);
+      return true;
+    }
+    if (code == 200) {
+      // Server ignored the Range header: start over from 0.
+      try {
+        file.deleteSync();
+      } catch (_) {}
+      startBytes = 0;
+      received = 0;
+    } else if (code != 206) {
+      await _writeUpdateState('failed', null, path, version, url);
+      return false;
+    }
+
+    final body = response.data;
+    if (body == null) {
+      await _writeUpdateState('paused', absoluteProgress, path, version, url);
+      return false;
+    }
+
+    // For 206 the content-length is only the remaining bytes; adding the
+    // bytes already on disk gives the total, so progress matches the APK.
+    final contentLength =
+        int.tryParse(response.headers.value(Headers.contentLengthHeader) ?? '') ?? 0;
+    absoluteTotal = received + contentLength;
+    if (absoluteTotal > 0) absoluteProgress = received / absoluteTotal;
+
+    final raf = file.openSync(mode: FileMode.append);
+    try {
+      await for (final chunk in body.stream) {
+        raf.writeFromSync(chunk);
+        received += chunk.length;
+        if (absoluteTotal > 0) {
+          pushState(received / absoluteTotal);
+        }
+      }
+    } finally {
+      raf.closeSync();
+    }
 
     await _writeUpdateState('done', 1, path, version, url);
     await _showDownloadReady(version);
     return true;
   } catch (e) {
     debugPrint('Background update download failed: $e');
-    await _writeUpdateState('failed', null, path, version, url);
+    // Paused: keep the bytes on disk. Returning false lets Workmanager retry
+    // (it waits for connectivity), and the in-app Retry button resumes from
+    // where the download stopped.
+    await _writeUpdateState('paused', absoluteProgress, path, version, url);
+    await _showDownloadPaused(s);
     return false;
   }
+}
+
+Future<void> _showDownloadPaused(SettingsService s) async {
+  final details = AndroidNotificationDetails(
+    _channelId,
+    _channelName,
+    channelDescription: _channelDescription,
+    importance: Importance.low,
+    priority: Priority.low,
+  );
+  await _notifications().show(
+    updateNotificationId,
+    s.t('notif_download_paused'),
+    s.t('download_paused'),
+    NotificationDetails(android: details),
+    payload: json.encode({'type': 'update_install'}),
+  );
 }
 
 Future<void> _showDownloadProgress(int percent) async {

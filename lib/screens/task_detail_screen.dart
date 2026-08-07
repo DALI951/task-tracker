@@ -348,6 +348,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         widget.isManager && (task.isPending || task.isDoing);
     final canUseCompletionPanel = canComplete || canCompleteAsManager;
 
+    // If the background upload stopped (no internet, timeout, server error),
+    // surface the reason + Retry. Retry re-uses the same session, so photos
+    // already uploaded are not re-uploaded.
+    final uploadStoppedReason =
+        context.watch<TaskProvider>().sessionErrors[task.id];
+
     // Smooth local byte progress while this screen is submitting; the
     // document's per-photo counters otherwise (task card, other device).
     final localFraction = _totalBytes == 0
@@ -539,6 +545,52 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               )),
             ],
             const SizedBox(height: 24),
+            if (task.isUploading && uploadStoppedReason != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Brand.problem.withAlpha(15),
+                  borderRadius: BorderRadius.circular(Brand.radiusMd),
+                  border: Border.all(color: Brand.problem.withAlpha(60)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.error_outline, size: 20, color: Brand.problem),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${t('upload_stopped_title')}: $uploadStoppedReason',
+                          style: TextStyle(fontSize: 13, color: cs.onSurface),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () =>
+                            context.read<TaskProvider>().retryUpload(task.id, isProblem: false),
+                        icon: const Icon(Icons.refresh),
+                        label: Text(t('retry')),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _stopUpload,
+                        icon: const Icon(Icons.stop_circle_outlined),
+                        label: Text(t('stop_upload')),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (task.isUploading) ...[
               Container(
                 width: double.infinity,
