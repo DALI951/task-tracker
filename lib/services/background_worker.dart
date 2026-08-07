@@ -290,7 +290,7 @@ Future<bool> _runUpdateDownloadTask(Map<String, dynamic>? inputData) async {
     } catch (_) {}
   }
 
-  await _writeUpdateState('downloading', 0, path, version);
+  await _writeUpdateState('downloading', 0, path, version, url);
   await _showDownloadProgress(0);
 
   var lastNotify = 0.0;
@@ -302,9 +302,11 @@ Future<bool> _runUpdateDownloadTask(Map<String, dynamic>? inputData) async {
       onReceiveProgress: (received, total) {
         if (total <= 0) return;
         final p = received / total;
-        if (p - lastWrite >= 0.01 || p >= 1) {
+        // Never write p >= 1 as 'downloading': the synchronous 'done' write
+        // below must be the last thing the state file ever sees.
+        if (p < 1 && p - lastWrite >= 0.01) {
           lastWrite = p;
-          unawaited(_writeUpdateState('downloading', p, path, version));
+          unawaited(_writeUpdateState('downloading', p, path, version, url));
         }
         if (p - lastNotify >= 0.02 || p >= 1) {
           lastNotify = p;
@@ -313,12 +315,12 @@ Future<bool> _runUpdateDownloadTask(Map<String, dynamic>? inputData) async {
       },
     );
 
-    await _writeUpdateState('done', 1, path, version);
+    await _writeUpdateState('done', 1, path, version, url);
     await _showDownloadReady(version);
     return true;
   } catch (e) {
     debugPrint('Background update download failed: $e');
-    await _writeUpdateState('failed', null, path, version);
+    await _writeUpdateState('failed', null, path, version, url);
     return false;
   }
 }
@@ -369,15 +371,19 @@ Future<String> updateStateFilePath() async {
   return '${dir.path}/update_state.json';
 }
 
-Future<void> _writeUpdateState(
-    String state, double? progress, String path, String version) async {
+/// Synchronous write so the progress/final writes can never interleave out of
+/// order: the final 'done' write is guaranteed to land last, and the app can
+/// never observe a stale 'downloading' state after completion.
+Future<void> _writeUpdateState(String state, double? progress, String path,
+    String version, String? url) async {
   try {
     final file = File(await updateStateFilePath());
-    await file.writeAsString(json.encode({
+    file.writeAsStringSync(json.encode({
       'state': state,
       'progress': progress,
       'path': path,
       'version': version,
+      'url': url,
     }));
   } catch (_) {}
 }

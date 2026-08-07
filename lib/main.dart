@@ -92,9 +92,14 @@ class TaskTrackerApp extends StatelessWidget {
         builder: (context) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Future.delayed(const Duration(seconds: 2), () {
-              if (context.mounted) {
-                _updateService.checkForUpdate(context);
-              }
+              if (!context.mounted) return;
+              // If a download is already running, finished or failed, the
+              // banner (and its Install/Retry button) handles it — showing
+              // the update modal here would let "Install Now" restart the
+              // download from 0.
+              final mgr = context.read<UpdateDownloadManager>();
+              if (!mgr.isIdle) return;
+              _updateService.checkForUpdate(context);
             });
             final settings = context.read<SettingsService>();
             context.read<TaskProvider>().attachSettings(settings);

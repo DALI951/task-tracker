@@ -63,9 +63,22 @@ class UpdateDownloadManager extends ChangeNotifier {
       _version = s.version;
       notifyListeners();
     } else if (s.state == 'downloading') {
+      // A stale 'downloading' file can outlive a worker that was killed after
+      // the bytes were all received (a p == 1 progress write clobbered 'done'
+      // in older builds). If the APK is actually on disk, call it done.
+      final recovered = _recoverDone(s);
+      if (recovered != null) {
+        _state = UpdateDownloadState.done;
+        _progress = 1;
+        _filePath = recovered;
+        _version = s.version;
+        notifyListeners();
+        return;
+      }
       _state = UpdateDownloadState.downloading;
       _progress = s.progress;
       _version = s.version;
+      await _ensureWorkerRunning(s);
       _startPolling();
       notifyListeners();
     } else if (s.state == 'failed') {
@@ -77,9 +90,42 @@ class UpdateDownloadManager extends ChangeNotifier {
   }
 
   /// Starts the background download worker. Returns immediately; progress is
-  /// followed through the state file and the notification.
+  /// followed through the state file and the notification. Never restarts an
+  /// already-running or already-finished download: reopening the app (or the
+  /// update modal reappearing) must not wipe the downloaded APK and start
+  /// from 0.
   Future<void> start(String url, String version) async {
-    if (_state == UpdateDownloadState.downloading) return;
+    final s = await _readStateFile();
+    if (s != null && s.state == 'done') {
+      _state = UpdateDownloadState.done;
+      _progress = 1;
+      _filePath = s.path;
+      _version = s.version;
+      notifyListeners();
+      return;
+    }
+    if (s != null && s.state == 'downloading') {
+      final recovered = _recoverDone(s);
+      if (recovered != null) {
+        _state = UpdateDownloadState.done;
+        _progress = 1;
+        _filePath = recovered;
+        _version = s.version;
+        notifyListeners();
+        return;
+      }
+      // A worker may already be running: keep (no-op) instead of replace.
+      // If it was killed, the keep registration starts a fresh one.
+      _url = url;
+      _version = version;
+      _state = UpdateDownloadState.downloading;
+      _progress = s.progress;
+      _error = null;
+      notifyListeners();
+      await _ensureWorkerRunning(s, url: url, version: version);
+      _startPolling();
+      return;
+    }
     _url = url;
     _version = version;
     _state = UpdateDownloadState.downloading;
@@ -87,7 +133,7 @@ class UpdateDownloadManager extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    await _writeStateFile('downloading', 0, null, version);
+    await _writeStateFile('downloading', 0, null, version, url);
     await Workmanager().registerOneOffTask(
       updateDownloadTaskName,
       updateDownloadTaskName,
@@ -96,6 +142,43 @@ class UpdateDownloadManager extends ChangeNotifier {
       existingWorkPolicy: ExistingWorkPolicy.replace,
     );
     _startPolling();
+  }
+
+  /// Registers the update worker only if a state file exists but no worker is
+  /// known to be running; `keep` never clobbers an active task.
+  Future<void> _ensureWorkerRunning(
+    ({String state, double? progress, String? path, String? version, String? url}) s, {
+    String? url,
+    String? version,
+  }) async {
+    final u = url ?? s.url;
+    final v = version ?? s.version;
+    if (u == null || v == null || u.isEmpty || v.isEmpty) return;
+    try {
+      await Workmanager().registerOneOffTask(
+        updateDownloadTaskName,
+        updateDownloadTaskName,
+        inputData: {'url': u, 'version': v},
+        constraints: Constraints(networkType: NetworkType.connected),
+        existingWorkPolicy: ExistingWorkPolicy.keep,
+      );
+    } catch (_) {}
+  }
+
+  /// If the state file says 'downloading' but the bytes were all received
+  /// (progress >= 99%) and the APK exists on disk, the download is effectively
+  /// complete -> returns the APK path, otherwise null.
+  String? _recoverDone(
+      ({String state, double? progress, String? path, String? version, String? url}) s) {
+    final p = s.progress;
+    final path = s.path;
+    if (p == null || p < 0.99 || path == null) return null;
+    try {
+      final f = File(path);
+      return f.existsSync() && f.lengthSync() > 0 ? path : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   void _startPolling() {
@@ -108,11 +191,14 @@ class UpdateDownloadManager extends ChangeNotifier {
             (s.progress! - (_progress ?? 0)).abs() >= 0.005) {
           _progress = s.progress;
           notifyListeners();
-        } else if (s.state == 'done') {
+        } else if (s.state == 'done' ||
+            (s.state == 'downloading' && _recoverDone(s) != null)) {
           _stopPolling();
           _state = UpdateDownloadState.done;
           _progress = 1;
           _filePath = s.path;
+          _url = s.url;
+          _version = s.version;
           notifyListeners();
         } else if (s.state == 'failed') {
           _stopPolling();
@@ -169,7 +255,7 @@ class UpdateDownloadManager extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<({String state, double? progress, String? path, String? version})?>
+  Future<({String state, double? progress, String? path, String? version, String? url})?>
       _readStateFile() async {
     try {
       final file = File(await updateStateFilePath());
@@ -180,6 +266,7 @@ class UpdateDownloadManager extends ChangeNotifier {
         progress: (map['progress'] as num?)?.toDouble(),
         path: map['path'] as String?,
         version: map['version'] as String?,
+        url: map['url'] as String?,
       );
     } catch (_) {
       return null;
@@ -187,7 +274,7 @@ class UpdateDownloadManager extends ChangeNotifier {
   }
 
   Future<void> _writeStateFile(
-      String state, double? progress, String? path, String version) async {
+      String state, double? progress, String? path, String version, String? url) async {
     try {
       final file = File(await updateStateFilePath());
       await file.writeAsString(json.encode({
@@ -195,6 +282,7 @@ class UpdateDownloadManager extends ChangeNotifier {
         'progress': progress,
         'path': path,
         'version': version,
+        'url': url,
       }));
     } catch (_) {}
   }
