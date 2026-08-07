@@ -39,7 +39,19 @@ class UserService {
     }
   }
 
+  /// Resolves the display name for an email. Order: the employee directory
+  /// (`employees/{email}.name` — readable by the employee themselves and by
+  /// managers), then the account `users` doc `displayName`, then the email
+  /// prefix as a last resort (never show a raw email as a name).
   Future<String> getDisplayName(String email) async {
+    if (email.isEmpty) return '';
+    try {
+      final empDoc = await _db.collection('employees').doc(email).get();
+      if (empDoc.exists) {
+        final name = empDoc.data()?['name'] as String?;
+        if (name != null && name.isNotEmpty) return name;
+      }
+    } catch (_) {}
     try {
       final snap = await _db.collection('users')
           .where('email', isEqualTo: email)

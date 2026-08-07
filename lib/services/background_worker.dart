@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:task_tracker/firebase_options.dart';
+import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/services/upload_finalizer.dart';
 import 'package:task_tracker/services/upload_session.dart';
@@ -26,6 +27,15 @@ const int updateNotificationId = 20000;
 
 FlutterLocalNotificationsPlugin _notifications() =>
     FlutterLocalNotificationsPlugin();
+
+SettingsService? _workerSettings;
+Future<SettingsService> _getSettings() async {
+  _workerSettings ??= SettingsService();
+  try {
+    await _workerSettings!.load();
+  } catch (_) {}
+  return _workerSettings!;
+}
 
 Future<void> _ensureChannel() async {
   const channel = AndroidNotificationChannel(
@@ -210,9 +220,12 @@ Future<void> _showUploadProgress(
   // uploading at once each session gets its own notification, and the title
   // says what is being uploaded.
   final isTask = session.type == 'task_completion';
-  final title = isTask ? 'Uploading task…' : 'Uploading report…';
+  final s = await _getSettings();
+  final title = isTask
+      ? s.t('notif_uploading_task')
+      : s.t('notif_uploading_report');
   final what = isTask ? session.taskTitle : '${session.reporterName}: ${session.description}';
-  final body = '${_shorten(what, 42)}\nPhoto $done/${session.photos.length}'
+  final body = '${_shorten(what, 42)}\n${s.t('notif_photo')} $done/${session.photos.length}'
       '${pct == null ? '' : ' · ${(pct * 100).round()}%'}';
   final details = AndroidNotificationDetails(
     _channelId,
@@ -247,12 +260,13 @@ String _shorten(String? s, int max) {
 Future<void> _showCompletionNotification(
     int notifId, UploadSession session) async {
   final isTask = session.type == 'task_completion';
+  final s = await _getSettings();
   final (title, body, tapType) = isTask
       ? session.approveDirectly
-          ? ('Task completed', '“${session.taskTitle}” approved', 'task_approved')
-          : ('Task submitted', '“${session.taskTitle}” sent for review', 'task_submitted')
-      : ('Problem reported',
-          '“${_shorten(session.description, 42)}” was sent to the manager',
+          ? (s.t('notify_task_completed_manager'), '“${session.taskTitle}” ${s.t('notif_approved_short')}', 'task_approved')
+          : (s.t('notif_task_submitted'), '“${session.taskTitle}” ${s.t('notif_sent_review_short')}', 'task_submitted')
+      : (s.t('problem_reported'),
+          '“${_shorten(session.description, 42)}” ${s.t('notif_problem_sent')}',
           'problem_reported');
   final details = AndroidNotificationDetails(
     _channelId,
@@ -326,6 +340,7 @@ Future<bool> _runUpdateDownloadTask(Map<String, dynamic>? inputData) async {
 }
 
 Future<void> _showDownloadProgress(int percent) async {
+  final s = await _getSettings();
   final details = AndroidNotificationDetails(
     _channelId,
     _channelName,
@@ -338,7 +353,7 @@ Future<void> _showDownloadProgress(int percent) async {
   );
   await _notifications().show(
     updateNotificationId,
-    'Downloading update…',
+    s.t('downloading_update'),
     'Task Tracker $percent%',
     NotificationDetails(android: details),
     payload: json.encode({'type': 'update_install'}),
@@ -346,21 +361,22 @@ Future<void> _showDownloadProgress(int percent) async {
 }
 
 Future<void> _showDownloadReady(String version) async {
-  const details = AndroidNotificationDetails(
+  final s = await _getSettings();
+  final details = AndroidNotificationDetails(
     _channelId,
     _channelName,
     channelDescription: _channelDescription,
     importance: Importance.high,
     priority: Priority.high,
     actions: [
-      AndroidNotificationAction('install', 'Install', showsUserInterface: true),
+      AndroidNotificationAction('install', s.t('install'), showsUserInterface: true),
     ],
   );
   await _notifications().show(
     updateNotificationId,
-    'Update ready to install',
-    'Task Tracker v$version downloaded',
-    const NotificationDetails(android: details),
+    s.t('notif_update_ready'),
+    'Task Tracker v$version ${s.t('notif_downloaded')}',
+    NotificationDetails(android: details),
     payload: json.encode({'type': 'update_install'}),
   );
 }

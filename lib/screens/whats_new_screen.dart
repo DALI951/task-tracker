@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
+import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_service.dart';
 
 class WhatsNewScreen extends StatefulWidget {
@@ -82,7 +84,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
                             });
                             _load();
                           },
-                          child: const Text('Retry'),
+                          child: Text(context.read<SettingsService>().t('retry')),
                         ),
                       ],
                     ),

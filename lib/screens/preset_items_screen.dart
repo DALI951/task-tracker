@@ -49,10 +49,10 @@ class _PresetItemsScreenState extends State<PresetItemsScreen> {
                   .addPresetItem(_ctrl.text.trim(), email);
               if (!ctx.mounted) return;
               if (!ok) {
-                toast(ctx, 'Failed to add item', error: true);
+                toast(ctx, context.read<SettingsService>().t('failed_add_item'), error: true);
                 return;
               }
-              toast(ctx, 'Item added');
+              toast(ctx, context.read<SettingsService>().t('item_added'));
               _ctrl.clear();
               Navigator.pop(ctx);
             },

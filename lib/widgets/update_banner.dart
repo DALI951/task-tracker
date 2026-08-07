@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_download_manager.dart';
 
 /// Shows the background update download progress on the home screens.
@@ -10,6 +11,7 @@ class UpdateBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final manager = context.watch<UpdateDownloadManager>();
+    final t = context.watch<SettingsService>().t;
     final cs = Theme.of(context).colorScheme;
 
     if (manager.isIdle) return const SizedBox.shrink();
@@ -29,8 +31,8 @@ class UpdateBanner extends StatelessWidget {
                   Expanded(
                     child: Text(
                       manager.progress != null
-                          ? 'Downloading update… ${(manager.progress! * 100).toInt()}%'
-                          : 'Downloading update…',
+                          ? '${t('downloading_update')} ${(manager.progress! * 100).toInt()}%'
+                          : t('downloading_update'),
                       style:
                           TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                     ),
@@ -64,13 +66,13 @@ class UpdateBanner extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  manager.error ?? 'Download failed',
+                  t(manager.error ?? 'download_failed'),
                   style: TextStyle(fontSize: 13, color: cs.onErrorContainer),
                 ),
               ),
               TextButton(
                 onPressed: manager.retry,
-                child: const Text('Retry'),
+                child: Text(t('retry')),
               ),
             ],
           ),
@@ -89,7 +91,7 @@ class UpdateBanner extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Update ready — tap Install to finish',
+                t('update_ready'),
                 style: TextStyle(fontSize: 13, color: cs.onPrimaryContainer),
               ),
             ),
@@ -98,7 +100,7 @@ class UpdateBanner extends StatelessWidget {
               style: FilledButton.styleFrom(
                 visualDensity: VisualDensity.compact,
               ),
-              child: const Text('Install'),
+              child: Text(t('install')),
             ),
           ],
         ),

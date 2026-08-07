@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
+import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/widgets/photo_viewer.dart';
 
@@ -14,6 +16,7 @@ class TaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = context.read<SettingsService>().t;
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -46,7 +49,7 @@ class TaskCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _statusBadge(task),
+                        _statusBadge(task, t),
                       ],
                     ),
                     if (task.description != null) ...[
@@ -164,7 +167,7 @@ class TaskCard extends StatelessWidget {
     );
   }
 
-  Widget _statusBadge(AppTask task) {
+  Widget _statusBadge(AppTask task, String Function(String) t) {
     Color bg, fg;
     String label;
     if (task.isUploading) {
@@ -173,23 +176,23 @@ class TaskCard extends StatelessWidget {
       final pct = task.uploadProgress == null
           ? ''
           : ' · ${(task.uploadProgress! * 100).round()}%';
-      label = 'Uploading ${task.uploadCompleted}/${task.uploadTotal}$pct';
+      label = '${t('uploading')} ${task.uploadCompleted}/${task.uploadTotal}$pct';
     } else if (task.isCompleted) {
       bg = Brand.done.withAlpha(25);
       fg = Brand.done;
-      label = 'Done';
+      label = t('done');
     } else if (task.isPendingReview) {
       bg = Brand.pendingReview.withAlpha(25);
       fg = Brand.pendingReview;
-      label = 'Review';
+      label = t('pending_review');
     } else if (task.isDoing) {
       bg = Brand.doing.withAlpha(25);
       fg = Brand.doing;
-      label = 'Doing';
+      label = t('doing');
     } else {
       bg = Brand.pending.withAlpha(25);
       fg = Brand.pending;
-      label = 'Pending';
+      label = t('pending');
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

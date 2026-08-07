@@ -161,7 +161,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                         border: const OutlineInputBorder(),
                       ),
                       validator: (v) =>
-                          v == null || v.isEmpty ? 'Required' : null,
+                          v == null || v.isEmpty ? t('required') : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -189,7 +189,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                           onChanged: (v) {
                             setDialogState(() => _selectedEmployeeEmail = v);
                           },
-                          validator: (v) => v == null ? 'Required' : null,
+                          validator: (v) => v == null ? t('required') : null,
                         ),
                       ),
                     if (employees.isEmpty)
@@ -490,7 +490,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                         isManager: context.read<SettingsService>().currentRole == 'manager',
                       );
                     },
-                    child: const Text('Retry'),
+                    child: Text(t('retry')),
                   ),
                 ],
               ),
@@ -536,7 +536,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                   items: [
                     DropdownMenuItem(value: 'active', child: Text(t('filter_active'))),
                     DropdownMenuItem(value: 'all', child: Text(t('filter_all'))),
-                    DropdownMenuItem(value: 'uploading', child: const Text('Uploading')),
+                    DropdownMenuItem(value: 'uploading', child: Text(t('uploading'))),
                     DropdownMenuItem(value: 'pending', child: Text(t('filter_pending'))),
                     DropdownMenuItem(value: 'doing', child: Text(t('filter_doing'))),
                     DropdownMenuItem(value: 'review', child: Text(t('filter_review'))),

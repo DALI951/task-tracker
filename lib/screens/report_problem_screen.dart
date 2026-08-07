@@ -98,8 +98,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           _selectedCarOrThing = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Problem reported'),
+          SnackBar(
+            content: Text(context.read<SettingsService>().t('problem_reported')),
             backgroundColor: Colors.green,
           ),
         );
@@ -196,8 +196,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 const SizedBox(width: 8),
                 Text(
                   _preparing
-                      ? 'Preparing photos…'
-                      : 'Photo $_uploadCompleted/$_uploadTotal'
+                      ? t('preparing_photos')
+                      : '${t('notif_photo')} $_uploadCompleted/$_uploadTotal'
                           '${_totalBytes == 0 ? '' : ' · ${((_bytesSent / _totalBytes) * 100).round()}%'}',
                 ),
               ]),
@@ -231,7 +231,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Text(
-                'No reports yet',
+                t('no_reports_yet'),
                 style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             )
@@ -262,13 +262,13 @@ class _ReportStatusCard extends StatelessWidget {
       final pct = problem.uploadProgress == null
           ? ''
           : ' · ${(problem.uploadProgress! * 100).round()}%';
-      label = 'Uploading ${problem.uploadCompleted}/${problem.uploadTotal}$pct';
+      label = '${context.read<SettingsService>().t('uploading')} ${problem.uploadCompleted}/${problem.uploadTotal}$pct';
     } else if (problem.isUploading) {
       // uploadsComplete == true but never flipped to 'open' -> it failed or
       // the app was closed mid-send; the report never reached the manager.
       fg = Colors.orange.shade800;
       icon = Icons.error_outline;
-      label = 'Interrupted';
+      label = context.read<SettingsService>().t('interrupted');
     } else if (problem.isResolved) {
       fg = Brand.done;
       icon = Icons.check_circle;

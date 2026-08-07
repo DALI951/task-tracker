@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
+import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_download_manager.dart';
 
 class UpdateModal extends StatefulWidget {
@@ -27,12 +28,12 @@ class UpdateModal extends StatefulWidget {
 
 class _UpdateModalState extends State<UpdateModal> {
   void _startBackgroundDownload() {
+    final t = context.read<SettingsService>().t;
     context
         .read<UpdateDownloadManager>()
         .start(widget.downloadUrl, widget.latestVersion);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Downloading the update in the background…')),
+      SnackBar(content: Text(t('downloading_background'))),
     );
     Navigator.pop(context);
   }
@@ -40,6 +41,7 @@ class _UpdateModalState extends State<UpdateModal> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = context.watch<SettingsService>().t;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
@@ -65,7 +67,7 @@ class _UpdateModalState extends State<UpdateModal> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Update Available',
+                      t('update_available'),
                       style: Theme.of(context)
                           .textTheme
                           .titleLarge
@@ -85,7 +87,7 @@ class _UpdateModalState extends State<UpdateModal> {
           const SizedBox(height: 20),
           if (widget.changelog.isNotEmpty) ...[
             Text(
-              "What's new",
+              t('whats_new'),
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: cs.onSurfaceVariant,
@@ -118,14 +120,14 @@ class _UpdateModalState extends State<UpdateModal> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: widget.onNever,
-                  child: const Text('Never'),
+                  child: Text(t('never')),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
                   onPressed: widget.onLater,
-                  child: const Text('Later'),
+                  child: Text(t('later')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -136,7 +138,7 @@ class _UpdateModalState extends State<UpdateModal> {
                     backgroundColor: cs.primary,
                     foregroundColor: cs.onPrimary,
                   ),
-                  child: const Text('Install'),
+                  child: Text(t('install')),
                 ),
               ),
             ],

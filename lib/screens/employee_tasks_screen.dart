@@ -138,7 +138,7 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                         final email = AuthService().currentUser?.email ?? '';
                         provider.listenToEmployeeTasks(email);
                       },
-                      child: const Text('Retry'),
+                      child: Text(context.read<SettingsService>().t('retry')),
 
                     ),
                   ],
@@ -178,7 +178,7 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                             provider.listenToEmployeeTasks(email);
                           },
                           icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
+                          label: Text(context.read<SettingsService>().t('retry')),
                         ),
                       ],
                     ],
@@ -211,7 +211,7 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                               items: [
                                 DropdownMenuItem(value: 'active', child: Text(t('filter_active'))),
                                 DropdownMenuItem(value: 'all', child: Text(t('filter_all'))),
-                                DropdownMenuItem(value: 'uploading', child: const Text('Uploading')),
+                                DropdownMenuItem(value: 'uploading', child: Text(t('uploading'))),
                                 DropdownMenuItem(value: 'pending', child: Text(t('filter_pending'))),
                                 DropdownMenuItem(value: 'doing', child: Text(t('filter_doing'))),
                                 DropdownMenuItem(value: 'review', child: Text(t('filter_review'))),

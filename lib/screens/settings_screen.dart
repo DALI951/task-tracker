@@ -395,10 +395,10 @@ class _AddPresetDialogState extends State<_AddPresetDialog> {
                 );
             if (!context.mounted) return;
             if (!ok) {
-              toast(context, 'Failed to create preset', error: true);
+              toast(context, t('failed_create_preset'), error: true);
               return;
             }
-            toast(context, 'Preset created');
+            toast(context, t('preset_created'));
             Navigator.pop(context);
           },
           child: Text(t('save')),

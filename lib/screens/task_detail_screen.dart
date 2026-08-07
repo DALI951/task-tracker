@@ -74,7 +74,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Future<void> _submitProof() async {
     if (_proofPhotos.isEmpty && _completionDescCtrl.text.trim().isEmpty) {
-      toast(context, 'Add a photo or enter a description', error: true);
+      toast(context, t('add_photo_or_description'), error: true);
       return;
     }
     final images = <Uint8List>[];
@@ -114,7 +114,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         toast(context, t('task_completed'));
         Navigator.pop(context);
       } else if (provider.lastUploadCancelled) {
-        toast(context, 'Upload stopped');
+        toast(context, t('upload_stopped'));
       } else {
         toast(context, provider.error ?? t('failed'), error: true);
       }
@@ -140,7 +140,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   void _stopUpload() {
     context.read<TaskProvider>().cancelUpload(widget.task.id);
-    if (mounted) toast(context, 'Upload stopped');
+    if (mounted) toast(context, t('upload_stopped'));
   }
 
   Future<void> _rejectWithReason() async {
@@ -645,7 +645,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               OutlinedButton.icon(
                 onPressed: _uploading ? null : _withdrawSubmission,
                 icon: const Icon(Icons.undo),
-                label: const Text('Withdraw submission'),
+                label: Text(t('withdraw_submission')),
               ),
             if (widget.isManager && !task.isCompleted && !task.isPendingReview && !task.isUploading)
               Padding(

@@ -62,9 +62,9 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                     ),
                   TextField(
                     controller: _emailCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: context.read<SettingsService>().t('email'),
+                      border: const OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.emailAddress,
                   ),
@@ -116,13 +116,13 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                             if (created) {
                               if (ctx.mounted) Navigator.pop(ctx);
                               if (mounted) {
-                                toast(context, 'Employee created');
+                                toast(context, context.read<SettingsService>().t('employee_created'));
                               }
                             } else {
                               setDState(() {
                                 creating = false;
                                 emailError = _emailConflict
-                                    ? 'Email already used — choose another email'
+                                    ? context.read<SettingsService>().t('email_already_used')
                                     : _createError;
                                 if (_emailConflict) {
                                   _emailCtrl.clear();
@@ -264,19 +264,18 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
         bool show = false;
         return StatefulBuilder(
           builder: (ctx, setDState) => AlertDialog(
-            title: const Text('Confirm your password'),
+            title: Text(context.read<SettingsService>().t('confirm_password')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                    'Enter your manager password to create this account. '
-                    'You will only be asked once per session.'),
+                Text(
+                    context.read<SettingsService>().t('manager_password_prompt')),
                 const SizedBox(height: 12),
                 TextField(
                   controller: ctrl,
                   decoration: InputDecoration(
-                    labelText: 'Your password',
+                    labelText: context.read<SettingsService>().t('your_password'),
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon:
@@ -291,11 +290,11 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
+                child: Text(context.read<SettingsService>().t('cancel')),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, ctrl.text),
-                child: const Text('Continue'),
+                child: Text(context.read<SettingsService>().t('continue')),
               ),
             ],
           ),
@@ -349,14 +348,13 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reset Password'),
+        title: Text(context.read<SettingsService>().t('reset_password')),
         content: Text(
-            'Send a password-reset email to $name ($email)? They will set a '
-            'new password themselves.'),
+            '${context.read<SettingsService>().t('reset_email_confirm')} $name ($email)? ${context.read<SettingsService>().t('reset_they_set')}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(context.read<SettingsService>().t('cancel')),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -364,13 +362,13 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                 await FirebaseAuth.instance
                     .sendPasswordResetEmail(email: email);
                 if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) toast(context, 'Reset email sent');
+                if (mounted) toast(context, context.read<SettingsService>().t('reset_email_sent'));
               } catch (e) {
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (mounted) toast(context, friendlyError(e), error: true);
               }
             },
-            child: const Text('Send Reset Email'),
+            child: Text(context.read<SettingsService>().t('send_reset_email')),
           ),
         ],
       ),
@@ -444,22 +442,19 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                           final confirmed = await showDialog<bool>(
                             context: context,
                             builder: (ctx) => AlertDialog(
-                              title: const Text('Delete Employee'),
+                              title: Text(context.read<SettingsService>().t('delete_employee')),
                               content: Text(
-                                  'Delete $name ($email)? They will no longer '
-                                  'be able to sign in. The account will be '
-                                  'fully removed when the new backend is '
-                                  'available.'),
+                                  '${context.read<SettingsService>().t('delete')} $name ($email)? ${context.read<SettingsService>().t('delete_employee_after')}'),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Cancel'),
+                                  child: Text(context.read<SettingsService>().t('cancel')),
                                 ),
                                 ElevatedButton(
                                   onPressed: () => Navigator.pop(ctx, true),
                                   style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.red),
-                                  child: const Text('Delete'),
+                                  child: Text(context.read<SettingsService>().t('delete')),
                                 ),
                               ],
                             ),
@@ -470,7 +465,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                                 .collection('employees')
                                 .doc(email)
                                 .delete();
-                            if (mounted) toast(context, 'Employee deleted');
+                            if (mounted) toast(context, context.read<SettingsService>().t('employee_deleted'));
                           } catch (e) {
                             if (mounted) {
                               toast(context, friendlyError(e), error: true);

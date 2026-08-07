@@ -43,7 +43,7 @@ class _ProblemsScreenState extends State<ProblemsScreen> {
                     items: [
                        DropdownMenuItem(value: 'all', child: Text(t('filter_all'))),
                        DropdownMenuItem(value: 'open', child: Text(t('filter_open'))),
-                       DropdownMenuItem(value: 'uploading', child: const Text('Uploading')),
+                       DropdownMenuItem(value: 'uploading', child: Text(t('uploading'))),
                        DropdownMenuItem(value: 'assigned', child: Text(t('filter_assigned'))),
                     ],
                      onChanged: (v) => setState(() => _filter = v ?? 'all'),
@@ -120,12 +120,12 @@ class _ProblemCard extends StatelessWidget {
       final pct = problem.uploadProgress == null
           ? ''
           : ' · ${(problem.uploadProgress! * 100).round()}%';
-      statusLabel = 'Uploading ${problem.uploadCompleted}/${problem.uploadTotal}$pct';
+      statusLabel = '${t('uploading')} ${problem.uploadCompleted}/${problem.uploadTotal}$pct';
     } else if (problem.isUploading) {
       // uploadsComplete but never 'open' -> the send failed or was cut short.
       statusBg = Colors.orange.withAlpha(25);
       statusFg = Colors.orange.shade800;
-      statusLabel = 'Interrupted';
+      statusLabel = t('interrupted');
     } else if (problem.isOpen) {
       statusBg = Brand.problem.withAlpha(25);
       statusFg = Brand.problem;
@@ -244,19 +244,6 @@ class _ProblemCard extends StatelessWidget {
                     icon: const Icon(Icons.task_alt, size: 18),
                     label: Text(t('convert_to_task')),
                   ),
-                ),
-              ),
-            if (problem.convertedToTaskId != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                   child: Text(
-                     problem.isAssigned
-                         ? '${t('filter_assigned')} →'
-                         : '${t('resolved')} ✓',
-                  style: TextStyle(
-                      color: problem.isAssigned ? Brand.doing : Brand.done,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600),
                 ),
               ),
           ],

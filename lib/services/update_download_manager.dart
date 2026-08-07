@@ -83,7 +83,7 @@ class UpdateDownloadManager extends ChangeNotifier {
       notifyListeners();
     } else if (s.state == 'failed') {
       _state = UpdateDownloadState.failed;
-      _error = 'Download failed. Check your connection and try again.';
+      _error = 'download_failed';
       _version = s.version;
       notifyListeners();
     }
@@ -203,7 +203,7 @@ class UpdateDownloadManager extends ChangeNotifier {
         } else if (s.state == 'failed') {
           _stopPolling();
           _state = UpdateDownloadState.failed;
-          _error = 'Download failed. Check your connection and try again.';
+          _error = 'download_failed';
           notifyListeners();
         }
       });
@@ -230,7 +230,7 @@ class UpdateDownloadManager extends ChangeNotifier {
     final path = s?.path ?? _filePath;
     if (path == null || !File(path).existsSync()) {
       _state = UpdateDownloadState.failed;
-      _error = 'Download missing. Please download again.';
+      _error = 'download_missing';
       notifyListeners();
       return;
     }

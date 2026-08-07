@@ -24,7 +24,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(context.read<SettingsService>().t('notifications')),
         centerTitle: true,
         actions: [
           IconButton(
@@ -185,14 +185,14 @@ class _NotificationTile extends StatelessWidget {
         return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Delete notification?'),
+            title: Text(context.read<SettingsService>().t('delete_notification_q')),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancel')),
+                  child: Text(context.read<SettingsService>().t('cancel'))),
               TextButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Delete')),
+                  child: Text(context.read<SettingsService>().t('delete'))),
             ],
           ),
         );

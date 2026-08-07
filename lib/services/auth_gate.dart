@@ -99,7 +99,7 @@ class _AuthGateState extends State<AuthGate> {
                             });
                             _resolveRole(settings, user.uid, user.email ?? '');
                           },
-                          child: const Text('Retry'),
+                          child: Text(settings.t('retry')),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(

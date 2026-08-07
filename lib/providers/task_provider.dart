@@ -715,7 +715,7 @@ class TaskProvider extends ChangeNotifier {
               .replaceAll('{name}', senderName),
       pushSenderName: senderName,
       historyAction: approveDirectly ? 'approved' : 'submitted_proof',
-      historyBy: user.displayName ?? user.email ?? 'unknown',
+      historyBy: senderName,
     );
     _sessionOnProgress[sessionId] = onProgress;
     _sessionOnByteProgress[sessionId] = onByteProgress;
@@ -1284,13 +1284,27 @@ class TaskProvider extends ChangeNotifier {
 
   void _addHistory(String taskId, String action, String detail) {
     final user = FirebaseAuth.instance.currentUser;
-    final event = HistoryEvent(
-      action: action,
-      by: user?.displayName ?? user?.email ?? 'unknown',
-      detail: detail,
-      at: DateTime.now(),
-    );
-    _firestore.appendHistory(taskId, event.toMap());
+    final email = user?.email ?? '';
+    final fallback = user?.email ?? 'unknown';
+    // Resolve the real display name (employee directory or account profile)
+    // so history never shows a raw email as a name.
+    _userService.getDisplayName(email).then((name) {
+      final event = HistoryEvent(
+        action: action,
+        by: name.isEmpty ? fallback : name,
+        detail: detail,
+        at: DateTime.now(),
+      );
+      _firestore.appendHistory(taskId, event.toMap());
+    }).catchError((_) {
+      final event = HistoryEvent(
+        action: action,
+        by: fallback,
+        detail: detail,
+        at: DateTime.now(),
+      );
+      _firestore.appendHistory(taskId, event.toMap());
+    });
   }
 
   @override
