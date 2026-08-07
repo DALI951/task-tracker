@@ -43,6 +43,7 @@ class PushNotificationService {
     if (kIsWeb) return;
 
     await _requestPermission();
+    await requestNotificationsPermission();
     await _createNotificationChannel();
     await _initLocalNotifications();
     await _saveToken();
@@ -64,6 +65,17 @@ class PushNotificationService {
         _onMessageOpenedApp(initialMessage);
       });
     }
+  }
+
+  /// Android 13+ needs the POST_NOTIFICATIONS runtime permission for the
+  /// local notifications the background uploader uses (progress, stopped,
+  /// resumed). Safe to call repeatedly: the system dialog shows only once.
+  Future<void> requestNotificationsPermission() async {
+    if (kIsWeb) return;
+    final android = _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    await android?.requestNotificationsPermission();
   }
 
   Future<void> _requestPermission() async {

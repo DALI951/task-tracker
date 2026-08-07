@@ -25,6 +25,11 @@ const String _channelName = 'Task Notifications';
 const String _channelDescription = 'Notifications for task updates';
 const int updateNotificationId = 20000;
 
+/// Consecutive automatic retries Workmanager is allowed to perform after a
+/// connectivity failure (each with backoff + network constraint). Beyond this
+/// the session stays 'failed' and only the in-app Retry button resumes it.
+const int maxUploadRetries = 6;
+
 FlutterLocalNotificationsPlugin _notifications() =>
     FlutterLocalNotificationsPlugin();
 
@@ -82,6 +87,16 @@ Future<bool> _runUploadTask(String sessionId) async {
     return true;
   }
 
+  // Workmanager re-ran this task automatically (connectivity came back):
+  // resume the SAME session — photos already uploaded keep their 'done'
+  // flag, so only the remaining ones go up — and tell the employee.
+  if (session.status == 'failed') {
+    await UploadSessionService.write(
+        session.copyWith(status: 'uploading', error: ''));
+    final s = await _getSettings();
+    await _showUploadResumed(session.notificationId, session, s);
+  }
+
   try {
     await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform);
@@ -116,8 +131,7 @@ Future<bool> _runUploadTask(String sessionId) async {
 
       final path = '${sessionDir.path}/${photo.file}';
       if (!File(path).existsSync()) {
-        await _markFailed(sessionId);
-        return false;
+        return !(await _markFailed(sessionId));
       }
       final bytes = File(path).readAsBytesSync();
 
@@ -165,9 +179,21 @@ Future<bool> _runUploadTask(String sessionId) async {
     }
     final s = await _getSettings();
     final reason = _uploadErrorReason(s, e);
-    await UploadSessionService.write(latest.copyWith(status: 'failed', error: reason));
+    final retries = latest.retryCount + 1;
+    await UploadSessionService.write(latest.copyWith(
+        status: 'failed', error: reason, retryCount: retries));
     await _showUploadFailed(notifId, latest, reason, s);
-    return true;
+    // Connectivity failures auto-retry: Workmanager waits for the network
+    // constraint, then re-runs this task (which resumes from 'failed' and
+    // fires the "Upload resumed" notification). Non-connectivity errors and
+    // attempts beyond the cap stop here — the in-app Retry button is the
+    // only way to continue then.
+    final retryable = e is DioException &&
+        (e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.receiveTimeout);
+    return retryable && retries <= maxUploadRetries ? false : true;
   }
 
   final completed = await UploadSessionService.read(sessionId);
@@ -193,10 +219,15 @@ Future<bool> _runUploadTask(String sessionId) async {
   return true;
 }
 
-Future<void> _markFailed(String sessionId) async {
+/// Marks a session failed and counts the attempt. Returns true when
+/// Workmanager should keep auto-retrying (used by the missing-file path).
+Future<bool> _markFailed(String sessionId) async {
   final session = await UploadSessionService.read(sessionId);
-  if (session == null || session.status == 'cancelled') return;
-  await UploadSessionService.write(session.copyWith(status: 'failed'));
+  if (session == null || session.status == 'cancelled') return true;
+  final retries = session.retryCount + 1;
+  await UploadSessionService.write(
+      session.copyWith(status: 'failed', retryCount: retries));
+  return retries <= maxUploadRetries;
 }
 
 /// Keeps the task/problem document's per-photo counters in sync while the
@@ -312,6 +343,35 @@ Future<void> _showUploadFailed(
     NotificationDetails(android: details),
     payload: json.encode({
       'type': session.type == 'task_completion' ? 'task_upload' : 'problem_upload',
+      'relatedId': session.docId,
+    }),
+  );
+}
+
+/// Replaces the stopped notification when Workmanager auto-resumes the upload
+/// after connectivity comes back.
+Future<void> _showUploadResumed(
+    int notifId, UploadSession session, SettingsService s) async {
+  final isTask = session.type == 'task_completion';
+  final what = isTask
+      ? session.taskTitle
+      : '${session.reporterName}: ${session.description}';
+  final body = '${_shorten(what, 42)}\n${s.t('notif_photo')} '
+      '${session.completedPhotos}/${session.photos.length}';
+  final details = AndroidNotificationDetails(
+    _channelId,
+    _channelName,
+    channelDescription: _channelDescription,
+    importance: Importance.high,
+    priority: Priority.high,
+  );
+  await _notifications().show(
+    notifId,
+    s.t('notif_upload_resumed'),
+    body,
+    NotificationDetails(android: details),
+    payload: json.encode({
+      'type': isTask ? 'task_upload' : 'problem_upload',
       'relatedId': session.docId,
     }),
   );

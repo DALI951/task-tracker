@@ -8,6 +8,7 @@ import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/screens/manage_employees_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
+import 'package:task_tracker/services/push_notification_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
@@ -30,6 +31,7 @@ class TaskDetailScreen extends StatefulWidget {
 
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
   bool _uploading = false;
+  bool _preparing = false;
   int _uploadCompleted = 0;
   int _uploadTotal = 0;
   int _bytesSent = 0;
@@ -77,15 +79,38 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       toast(context, t('add_photo_or_description'), error: true);
       return;
     }
-    final images = <Uint8List>[];
-    for (final file in _proofPhotos) {
-      images.add(await file.readAsBytes());
-    }
+    // The upload keeps running in the background after this screen closes;
+    // its progress/stopped/resumed notifications need this permission.
+    await PushNotificationService().requestNotificationsPermission();
+    if (!mounted) return;
+    // Show feedback BEFORE reading the picked photos: decoding many large
+    // photos takes a moment, and without this the UI looks frozen.
     setState(() {
       _uploading = true;
+      _preparing = true;
       _uploadCompleted = 0;
-      _uploadTotal = _proofPhotos.length;
+      _uploadTotal = 0;
       _bytesSent = 0;
+      _totalBytes = 0;
+    });
+    final images = <Uint8List>[];
+    try {
+      for (final file in _proofPhotos) {
+        images.add(await file.readAsBytes());
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploading = false;
+        _preparing = false;
+      });
+      toast(context, friendlyError(e), error: true);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _preparing = false;
+      _uploadTotal = _proofPhotos.length;
       _totalBytes = images.fold<int>(0, (sum, b) => sum + b.length);
     });
     try {
@@ -776,7 +801,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ? null
         : (_bytesSent / _totalBytes).clamp(0.0, 1.0);
     return Column(children: [
-      if (_uploading)
+      if (_uploading && _preparing)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(t('preparing_photos'), style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant))),
+          ]),
+        )
+      else if (_uploading)
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Row(children: [

@@ -7,6 +7,7 @@ import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_service.dart';
+import 'package:task_tracker/services/push_notification_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/device_utils.dart';
@@ -47,6 +48,10 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
   Future<void> _send() async {
     if (_descCtrl.text.trim().isEmpty) return;
+    // The upload keeps running in the background after this screen closes;
+    // its progress/stopped/resumed notifications need this permission.
+    await PushNotificationService().requestNotificationsPermission();
+    if (!mounted) return;
     // Show feedback immediately: reading/decoding the picked photos into
     // memory can take a moment with many photos, then upload progress runs.
     setState(() {

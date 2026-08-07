@@ -343,6 +343,7 @@ class SettingsService extends ChangeNotifier {
       'upload_error_generic': 'Upload failed',
       'download_paused': 'Download paused — check your connection, then tap Retry',
       'notif_download_paused': 'Download paused',
+      'notif_upload_resumed': 'Upload resumed',
     },
     'fr': {
       'app_name': 'Gestionnaire de Tâches',
@@ -575,6 +576,7 @@ class SettingsService extends ChangeNotifier {
       'upload_error_generic': 'Échec du téléchargement',
       'download_paused': 'Téléchargement en pause — vérifiez votre connexion, puis appuyez sur Réessayer',
       'notif_download_paused': 'Téléchargement en pause',
+      'notif_upload_resumed': 'Téléchargement repris',
     },
     'ar': {
       'app_name': 'مدير المهام',
@@ -807,6 +809,7 @@ class SettingsService extends ChangeNotifier {
       'upload_error_generic': 'فشل الرفع',
       'download_paused': 'توقف التحميل مؤقتاً — تحقق من اتصالك ثم اضغط إعادة المحاولة',
       'notif_download_paused': 'توقف التحميل مؤقتاً',
+      'notif_upload_resumed': 'استؤنف الرفع',
     },
   };
 

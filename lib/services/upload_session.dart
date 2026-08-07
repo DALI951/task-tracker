@@ -73,6 +73,7 @@ class UploadSession {
 
   String status; // uploading | done | cancelled | failed
   String error; // human-readable reason when status == 'failed' (localized)
+  int retryCount; // consecutive auto-retries Workmanager performed (capped)
   bool finalApplied;
   bool pendingApply;
   int bytesSent;
@@ -106,6 +107,7 @@ class UploadSession {
     this.historyBy = '',
     this.status = 'uploading',
     this.error = '',
+    this.retryCount = 0,
     this.finalApplied = false,
     this.pendingApply = false,
     this.bytesSent = 0,
@@ -144,6 +146,7 @@ class UploadSession {
         'historyBy': historyBy,
         'status': status,
         'error': error,
+        'retryCount': retryCount,
         'finalApplied': finalApplied,
         'pendingApply': pendingApply,
         'bytesSent': bytesSent,
@@ -180,6 +183,7 @@ class UploadSession {
         historyBy: map['historyBy'] as String? ?? '',
         status: map['status'] as String? ?? 'uploading',
         error: map['error'] as String? ?? '',
+        retryCount: map['retryCount'] as int? ?? 0,
         finalApplied: map['finalApplied'] as bool? ?? false,
         pendingApply: map['pendingApply'] as bool? ?? false,
         bytesSent: map['bytesSent'] as int? ?? 0,
@@ -191,6 +195,7 @@ class UploadSession {
   UploadSession copyWith({
     String? status,
     String? error,
+    int? retryCount,
     bool? finalApplied,
     bool? pendingApply,
     int? bytesSent,
@@ -223,6 +228,7 @@ class UploadSession {
         historyBy: historyBy,
         status: status ?? this.status,
         error: error ?? this.error,
+        retryCount: retryCount ?? this.retryCount,
         finalApplied: finalApplied ?? this.finalApplied,
         pendingApply: pendingApply ?? this.pendingApply,
         bytesSent: bytesSent ?? this.bytesSent,

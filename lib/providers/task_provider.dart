@@ -847,7 +847,7 @@ class TaskProvider extends ChangeNotifier {
     if (session == null || session.finalApplied) return;
     if (session.status == 'done' || session.status == 'cancelled') return;
     await UploadSessionService.write(
-        session.copyWith(status: 'uploading', error: ''));
+        session.copyWith(status: 'uploading', error: '', retryCount: 0));
     _sessionErrors.remove(docId);
     notifyListeners();
     try {
