@@ -27,6 +27,7 @@ class TaskProvider extends ChangeNotifier {
   List<AppTask> _pendingReview = [];
   List<PresetTask> _presets = [];
   List<Problem> _problems = [];
+  List<Problem> _myProblems = [];
   List<Map<String, dynamic>> _employees = [];
   List<PresetItem> _presetItems = [];
   bool _loading = true;
@@ -42,6 +43,7 @@ class TaskProvider extends ChangeNotifier {
   StreamSubscription? _problemSub;
   StreamSubscription? _employeeSub;
   StreamSubscription? _itemSub;
+  StreamSubscription? _myProblemSub;
   final Map<String, Timer> _restartTimers = {};
   final Map<String, int> _restartAttempts = {};
   static const int _maxRestartAttempts = 20;
@@ -49,9 +51,14 @@ class TaskProvider extends ChangeNotifier {
   static const _kTasks = 'tasks';
   static const _kReview = 'review';
   static const _kProblems = 'problems';
+  static const _kMyProblems = 'myProblems';
   static const _kPresets = 'presets';
   static const _kEmployees = 'employees';
   static const _kPresetItems = 'presetItems';
+
+  String? _cancelTaskId;
+  bool _uploadCancelled = false;
+  bool get lastUploadCancelled => _uploadCancelled;
 
   String _t(String key) => _settings?.t(key) ?? key;
 
@@ -59,6 +66,7 @@ class TaskProvider extends ChangeNotifier {
   List<AppTask> get pendingReview => _pendingReview;
   List<PresetTask> get presets => _presets;
   List<Problem> get problems => _problems;
+  List<Problem> get myProblems => _myProblems;
   List<Map<String, dynamic>> get employees => _employees;
   List<PresetItem> get presetItems => _presetItems;
   bool get loading => _loading;
@@ -101,12 +109,21 @@ class TaskProvider extends ChangeNotifier {
     });
   }
 
-  void _resetRestartBudget() {
-    _restartAttempts.clear();
-    for (final t in _restartTimers.values) {
-      t.cancel();
+  // Resets the retry budget of a single stream after it recovers. When no
+  // key is given, clears every stream's budget and pending timers (used on
+  // logout/dispose only) so one healthy stream can never cancel another
+  // stream's pending restart.
+  void _resetRestartBudget([String? key]) {
+    if (key == null) {
+      _restartAttempts.clear();
+      for (final t in _restartTimers.values) {
+        t.cancel();
+      }
+      _restartTimers.clear();
+      return;
     }
-    _restartTimers.clear();
+    _restartAttempts.remove(key);
+    _restartTimers.remove(key)?.cancel();
   }
 
   List<AppTask> searchTasks(String query) {
@@ -125,8 +142,8 @@ class TaskProvider extends ChangeNotifier {
       if (a.status != b.status) {
         if (a.isCompleted) return 1;
         if (b.isCompleted) return -1;
-        if (a.isDoing) return -1;
-        if (b.isDoing) return 1;
+        if (a.isDoing || a.isUploading) return -1;
+        if (b.isDoing || b.isUploading) return 1;
         if (a.isPendingReview) return -1;
         if (b.isPendingReview) return 1;
       }
@@ -145,12 +162,15 @@ class TaskProvider extends ChangeNotifier {
     _presetSub = null;
     _problemSub?.cancel();
     _problemSub = null;
+    _myProblemSub?.cancel();
+    _myProblemSub = null;
     _employeeSub?.cancel();
     _employeeSub = null;
     _itemSub?.cancel();
     _itemSub = null;
     _tasks = [];
     _pendingReview = [];
+    _myProblems = [];
     _loading = true;
     notifyListeners();
   }
@@ -178,7 +198,7 @@ class TaskProvider extends ChangeNotifier {
         }).toList());
         _loading = false;
         _connected = true;
-        _resetRestartBudget();
+        _resetRestartBudget(_kTasks);
         notifyListeners();
       },
       onError: (e) {
@@ -216,7 +236,7 @@ class TaskProvider extends ChangeNotifier {
         }).toList());
         _loading = false;
         _connected = true;
-        _resetRestartBudget();
+        _resetRestartBudget(_kTasks);
         notifyListeners();
       },
       onError: (e) {
@@ -243,6 +263,7 @@ class TaskProvider extends ChangeNotifier {
             })
             .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _resetRestartBudget(_kReview);
         notifyListeners();
       },
       onError: (e) {
@@ -263,7 +284,7 @@ class TaskProvider extends ChangeNotifier {
         _problems = snapshot.docs.map((doc) {
           return Problem.fromMap(doc.data() as Map<String, dynamic>, doc.id);
         }).toList();
-        _resetRestartBudget();
+        _resetRestartBudget(_kProblems);
         notifyListeners();
       },
       onError: (e) {
@@ -271,6 +292,27 @@ class TaskProvider extends ChangeNotifier {
         _problemsError = friendlyError(e);
         notifyListeners();
         _scheduleRestart(_kProblems, () => listenToProblems(isManager: isManager));
+      },
+    );
+  }
+
+  /// Problems reported by this user (employees read their own reports so the
+  /// Report screen can show per-report upload progress and final status).
+  void listenToMyProblems(String email) {
+    _myProblemSub?.cancel();
+    if (email.isEmpty) return;
+    _myProblemSub = _firestore.problemsReportedBy(email).listen(
+      (snapshot) {
+        _myProblems = snapshot.docs
+            .map((doc) =>
+                Problem.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _resetRestartBudget(_kMyProblems);
+        notifyListeners();
+      },
+      onError: (e) {
+        _scheduleRestart(_kMyProblems, () => listenToMyProblems(email));
       },
     );
   }
@@ -283,6 +325,7 @@ class TaskProvider extends ChangeNotifier {
         return PresetTask.fromMap(doc.data() as Map<String, dynamic>, doc.id);
       }).toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      _resetRestartBudget(_kPresets);
       notifyListeners();
     },
     onError: (e) {
@@ -299,6 +342,7 @@ class TaskProvider extends ChangeNotifier {
       _employees = snapshot.docs
           .map((doc) => doc.data() as Map<String, dynamic>)
           .toList();
+      _resetRestartBudget(_kEmployees);
       notifyListeners();
     },
     onError: (e) {
@@ -315,6 +359,7 @@ class TaskProvider extends ChangeNotifier {
         return PresetItem.fromMap(doc.data() as Map<String, dynamic>, doc.id);
       }).toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      _resetRestartBudget(_kPresetItems);
       notifyListeners();
     },
     onError: (e) {
@@ -455,6 +500,8 @@ class TaskProvider extends ChangeNotifier {
     void Function(int completed, int total)? onProgress,
   }) async {
     final photoUrls = <String>[];
+    _uploadCancelled = false;
+    _cancelTaskId = null;
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) { _error = 'Not signed in'; notifyListeners(); return false; }
@@ -471,6 +518,19 @@ class TaskProvider extends ChangeNotifier {
           'rejectionReason': null,
         });
         for (var i = 0; i < images.length; i++) {
+          if (_uploadCancelled && _cancelTaskId == taskId) {
+            // Employee pressed Stop: keep the photos uploaded so far, return
+            // the task to 'doing' so its buttons come back.
+            try {
+              await _firestore.updateTask(taskId, {
+                'status': 'doing',
+                'uploadsComplete': true,
+                'uploadCompleted': photoUrls.length,
+                'uploadTotal': images.length,
+              });
+            } catch (_) {}
+            return false;
+          }
           final url = await _storage.uploadImage(
             images[i],
             'task_photos/$taskId/photo_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg',
@@ -580,6 +640,20 @@ class TaskProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Employee pressed Stop during a photo upload: flags the running
+  /// `completeTaskWithProof` loop to halt and immediately returns the task
+  /// to 'doing' (photos uploaded so far are kept on the document).
+  void cancelUpload(String taskId) {
+    _cancelTaskId = taskId;
+    _uploadCancelled = true;
+    try {
+      _firestore.updateTask(taskId, {
+        'status': 'doing',
+        'uploadsComplete': true,
+      });
+    } catch (_) {}
   }
 
   Future<bool> withdrawTaskSubmission(String taskId) async {
@@ -916,6 +990,7 @@ class TaskProvider extends ChangeNotifier {
     _reviewSub?.cancel();
     _presetSub?.cancel();
     _problemSub?.cancel();
+    _myProblemSub?.cancel();
     _employeeSub?.cancel();
     _itemSub?.cancel();
     super.dispose();

@@ -39,11 +39,17 @@ service cloud.firestore {
       allow create: if isAuth() && isManager(request.auth.uid)
         && request.resource.data.createdBy == userEmail();
 
-      // Managers: read/update/delete their own tasks
-      allow read, update, delete: if isAuth() && isManager(request.auth.uid)
+      // Managers: read their own tasks. Reads never reference
+      // request.resource (only defined on writes), so a read can't be denied
+      // by a stale write-guard clause.
+      allow read: if isAuth() && isManager(request.auth.uid)
+        && resource.data.createdBy == userEmail();
+
+      // Managers: update/delete their own tasks. A review may only be
+      // approved after the employee's complete upload has been recorded.
+      // Legacy tasks without the flag stay protected.
+      allow update, delete: if isAuth() && isManager(request.auth.uid)
         && resource.data.createdBy == userEmail()
-        // A review may only be approved after the employee's complete upload
-        // has been recorded. Legacy tasks without the flag stay protected.
         && (!(
           resource.data.status == 'pending_review' &&
           request.resource.data.status == 'completed'
@@ -118,6 +124,10 @@ service cloud.firestore {
       // Managers only see problems tagged to their own email.
       allow read: if isAuth() && isManager(request.auth.uid)
         && resource.data.managerEmail == userEmail();
+
+      // Employees can read the problems they reported (e.g. the "My Reports"
+      // list with upload status).
+      allow read: if isAuth() && resource.data.reportedBy == userEmail();
 
       allow update, delete: if isAuth() && isManager(request.auth.uid)
         && resource.data.managerEmail == userEmail();

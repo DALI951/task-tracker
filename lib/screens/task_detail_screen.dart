@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
@@ -64,15 +63,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _pickProofPhoto() async {
-    final picker = ImagePicker();
-    final maxDim = await pickerMaxDimension();
-    final picked = await picker.pickImage(
-      source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
-          ? ImageSource.gallery
-          : ImageSource.camera,
-      maxWidth: maxDim,
-      maxHeight: maxDim,
-    );
+    final picked = await pickPhoto(context);
     if (picked == null) return;
 
     if (_proofPhotos.length >= 50) return;
@@ -103,11 +94,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         },
       );
       if (!mounted) return;
+      final provider = context.read<TaskProvider>();
       if (ok) {
         toast(context, t('task_completed'));
         Navigator.pop(context);
+      } else if (provider.lastUploadCancelled) {
+        toast(context, 'Upload stopped');
       } else {
-        toast(context, context.read<TaskProvider>().error ?? t('failed'), error: true);
+        toast(context, provider.error ?? t('failed'), error: true);
       }
     } catch (e) {
       if (mounted) toast(context, friendlyError(e), error: true);
@@ -117,15 +111,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _completeAsManager() async {
-    final picker = ImagePicker();
-    final maxDim = await pickerMaxDimension();
-    final picked = await picker.pickImage(
-      source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
-          ? ImageSource.gallery
-          : ImageSource.camera,
-      maxWidth: maxDim,
-      maxHeight: maxDim,
-    );
+    final picked = await pickPhoto(context);
     if (picked == null) return;
 
     setState(() => _uploading = true);
@@ -164,6 +150,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Future<void> _withdrawSubmission() async {
     final ok = await context.read<TaskProvider>().withdrawTaskSubmission(widget.task.id);
     if (mounted) toast(context, ok ? t('saved') : context.read<TaskProvider>().error ?? t('failed'), error: !ok);
+  }
+
+  void _stopUpload() {
+    context.read<TaskProvider>().cancelUpload(widget.task.id);
+    if (mounted) toast(context, 'Upload stopped');
   }
 
   Future<void> _rejectWithReason() async {
@@ -396,7 +387,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final task = widget.task;
+    // Watch the provider so upload progress (photo X/Y) updates live on this
+    // screen while the task document is being written per photo.
+    final task = context.watch<TaskProvider>().tasks
+            .where((t) => t.id == widget.task.id)
+            .firstOrNull ??
+        widget.task;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
     final userEmail = AuthService().currentUser?.email ?? '';
     final cs = Theme.of(context).colorScheme;
@@ -410,13 +406,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(task.isCompleted
-            ? t('completed')
-            : task.isPendingReview
-                ? t('pending_review')
-                : task.isDoing
-                    ? t('doing')
-                    : t('pending')),
+        title: Text(task.isUploading
+            ? '${t('uploading')} (${task.uploadCompleted}/${task.uploadTotal})'
+            : task.isCompleted
+                ? t('completed')
+                : task.isPendingReview
+                    ? t('pending_review')
+                    : task.isDoing
+                        ? t('doing')
+                        : t('pending')),
         actions: [
           if (widget.isManager && !task.isCompleted)
             IconButton(
@@ -588,6 +586,62 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               )),
             ],
             const SizedBox(height: 24),
+            if (task.isUploading) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withAlpha(15),
+                  borderRadius: BorderRadius.circular(Brand.radiusMd),
+                  border: Border.all(color: Colors.blue.withAlpha(60)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.cloud_upload,
+                            size: 20, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: task.uploadProgress,
+                              minHeight: 6,
+                              backgroundColor: cs.surfaceContainerHighest,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${task.uploadCompleted}/${task.uploadTotal}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.blue),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${t('uploading')} ${t('proof_photo')}…',
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    ),
+                    if (!widget.isManager) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _stopUpload,
+                          icon: const Icon(Icons.stop_circle_outlined),
+                          label: Text(t('stop_upload')),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (canStart)
               SizedBox(
                 width: double.infinity,
@@ -686,7 +740,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 icon: const Icon(Icons.undo),
                 label: const Text('Withdraw submission'),
               ),
-            if (widget.isManager && !task.isCompleted && !task.isPendingReview)
+            if (widget.isManager && !task.isCompleted && !task.isPendingReview && !task.isUploading)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: SizedBox(
@@ -698,7 +752,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ),
                 ),
               ),
-            if (widget.isManager)
+            if (widget.isManager && !task.isUploading)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: SizedBox(
@@ -794,7 +848,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     Color bg, fg;
     IconData icon;
     String label;
-    if (task.isCompleted) {
+    if (task.isUploading) {
+      bg = Colors.blue.withAlpha(25);
+      fg = Colors.blue.shade700;
+      icon = Icons.cloud_upload;
+      label = '${t('uploading')} ${task.uploadCompleted}/${task.uploadTotal}';
+    } else if (task.isCompleted) {
       bg = Brand.done.withAlpha(25);
       fg = Brand.done;
       icon = Icons.check_circle;

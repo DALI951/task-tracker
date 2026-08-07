@@ -33,6 +33,7 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final email = AuthService().currentUser?.email ?? '';
       context.read<TaskProvider>().listenToEmployeeTasks(email);
+      context.read<TaskProvider>().listenToMyProblems(email);
       final us = UpdateService();
       us.isOnHomeScreen = true;
       us.setHomeContext(context);
@@ -53,6 +54,7 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
     var filtered = tasks;
     if (_taskFilter == 'all') {}
     else if (_taskFilter == 'active') filtered = tasks.where((t) => !t.isCompleted).toList();
+    else if (_taskFilter == 'uploading') filtered = tasks.where((t) => t.isUploading).toList();
     else if (_taskFilter == 'pending') filtered = tasks.where((t) => t.isPending).toList();
     else if (_taskFilter == 'doing') filtered = tasks.where((t) => t.isDoing).toList();
     else if (_taskFilter == 'review') filtered = tasks.where((t) => t.isPendingReview).toList();
@@ -209,6 +211,7 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
                               items: [
                                 DropdownMenuItem(value: 'active', child: Text(t('filter_active'))),
                                 DropdownMenuItem(value: 'all', child: Text(t('filter_all'))),
+                                DropdownMenuItem(value: 'uploading', child: const Text('Uploading')),
                                 DropdownMenuItem(value: 'pending', child: Text(t('filter_pending'))),
                                 DropdownMenuItem(value: 'doing', child: Text(t('filter_doing'))),
                                 DropdownMenuItem(value: 'review', child: Text(t('filter_review'))),

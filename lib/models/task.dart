@@ -81,6 +81,13 @@ class AppTask {
   bool get isDoing => status == 'doing';
   bool get isPending => status == 'pending';
   bool get isPendingReview => status == 'pending_review';
+  bool get isUploading => status == 'uploading';
+
+  /// 0..1 upload progress; null when no upload is in flight.
+  double? get uploadProgress {
+    if (!isUploading || uploadTotal <= 0) return null;
+    return (uploadCompleted / uploadTotal).clamp(0.0, 1.0);
+  }
 
   factory AppTask.fromMap(Map<String, dynamic> map, String docId) {
     return AppTask(

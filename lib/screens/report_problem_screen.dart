@@ -1,14 +1,15 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:task_tracker/config/brand.dart';
+import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/user_service.dart';
-import 'package:task_tracker/utils/error_handler.dart';
 import 'package:task_tracker/utils/device_utils.dart';
+import 'package:task_tracker/utils/error_handler.dart';
 
 class ReportProblemScreen extends StatefulWidget {
   const ReportProblemScreen({super.key});
@@ -24,6 +25,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   bool _sending = false;
   int _uploadCompleted = 0;
   int _uploadTotal = 0;
+  String? _pendingReportDesc;
 
   @override
   void dispose() {
@@ -32,15 +34,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   }
 
   Future<void> _takePhoto() async {
-    final picker = ImagePicker();
-    final maxDim = await pickerMaxDimension();
-    final picked = await picker.pickImage(
-      source: kIsWeb || defaultTargetPlatform != TargetPlatform.android
-          ? ImageSource.gallery
-          : ImageSource.camera,
-      maxWidth: maxDim,
-      maxHeight: maxDim,
-    );
+    final picked = await pickPhoto(context);
     if (picked == null || _photos.length >= 50) return;
     final bytes = await picked.readAsBytes();
     setState(() => _photos.add(bytes));
@@ -52,6 +46,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
       _sending = true;
       _uploadCompleted = 0;
       _uploadTotal = _photos.length;
+      _pendingReportDesc = _descCtrl.text.trim();
     });
     try {
       final user = AuthService().currentUser;
@@ -72,13 +67,18 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           );
       if (!mounted) return;
       if (ok) {
+        setState(() {
+          _pendingReportDesc = null;
+          _descCtrl.clear();
+          _photos.clear();
+          _selectedCarOrThing = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Problem reported'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
       } else {
         final provider = context.read<TaskProvider>();
         final err = provider.reportError ?? friendlyError(Exception('report_failed'));
@@ -88,9 +88,11 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             backgroundColor: Colors.red,
           ),
         );
+        setState(() => _pendingReportDesc = null);
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _pendingReportDesc = null);
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
@@ -103,6 +105,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   Widget build(BuildContext context) {
     final t = context.watch<SettingsService>().t;
     final items = context.watch<TaskProvider>().presetItems;
+    final reports = context.watch<TaskProvider>().myProblems;
 
     return Scaffold(
       appBar: AppBar(title: Text(t('report_problem'))),
@@ -121,17 +124,17 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           if (items.isNotEmpty)
                   DropdownButtonFormField<String>(
                     value: _selectedCarOrThing,
-              decoration: InputDecoration(
-                labelText: t('car_thing'),
-                border: const OutlineInputBorder(),
-              ),
-              items: [
-                DropdownMenuItem(value: null, child: Text(t('none'))),
-                ...items.map(
-                    (i) => DropdownMenuItem(value: i.name, child: Text(i.name))),
-              ],
-              onChanged: (v) => setState(() => _selectedCarOrThing = v),
+            decoration: InputDecoration(
+              labelText: t('car_thing'),
+              border: const OutlineInputBorder(),
             ),
+            items: [
+              DropdownMenuItem(value: null, child: Text(t('none'))),
+              ...items.map(
+                  (i) => DropdownMenuItem(value: i.name, child: Text(i.name))),
+            ],
+            onChanged: (v) => setState(() => _selectedCarOrThing = v),
+          ),
           const SizedBox(height: 16),
           if (_photos.isNotEmpty)
             SizedBox(
@@ -153,7 +156,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: _photos.length >= 50 ? null : _takePhoto,
+            onPressed: _sending || _photos.length >= 50 ? null : _takePhoto,
             icon: const Icon(Icons.camera_alt),
             label: Text('${t('take_photo')} (${_photos.length}/50)'),
           ),
@@ -184,7 +187,134 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                   : Text(t('send')),
             ),
           ),
+          const SizedBox(height: 24),
+          Text(
+            t('my_reports'),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (_pendingReportDesc != null) _inFlightReportCard(),
+          if (reports.isEmpty && _pendingReportDesc == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                'No reports yet',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            )
+          else
+            ...reports.map((p) => _ReportStatusCard(problem: p)),
         ],
+      ),
+    );
+  }
+
+  Widget _inFlightReportCard() {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _pendingReportDesc!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, color: cs.onSurface),
+            ),
+            const SizedBox(height: 10),
+            Row(children: [
+              const Icon(Icons.cloud_upload, size: 18, color: Colors.blue),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: _uploadTotal == 0
+                        ? null
+                        : _uploadCompleted / _uploadTotal,
+                    minHeight: 6,
+                    backgroundColor: cs.surfaceContainerHighest,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$_uploadCompleted/$_uploadTotal',
+                style: const TextStyle(fontSize: 12, color: Colors.blue),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportStatusCard extends StatelessWidget {
+  final Problem problem;
+  const _ReportStatusCard({required this.problem});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dateFormat = DateFormat('MMM d, HH:mm');
+
+    Color fg;
+    IconData icon;
+    String label;
+    if (problem.isResolved) {
+      fg = Brand.done;
+      icon = Icons.check_circle;
+      label = context.read<SettingsService>().t('complete');
+    } else if (problem.isAssigned) {
+      fg = Brand.doing;
+      icon = Icons.person_pin;
+      label = context.read<SettingsService>().t('filter_assigned');
+    } else {
+      fg = Brand.done;
+      icon = Icons.check_circle_outline;
+      label = context.read<SettingsService>().t('complete');
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    problem.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14, color: cs.onSurface),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(icon, size: 18, color: fg),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                      fontSize: 12, color: fg, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              dateFormat.format(problem.createdAt),
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
       ),
     );
   }

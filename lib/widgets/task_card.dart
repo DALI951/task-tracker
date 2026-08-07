@@ -60,6 +60,31 @@ class TaskCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (task.isUploading) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: task.uploadProgress,
+                                minHeight: 5,
+                                backgroundColor: cs.surfaceContainerHighest,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${task.uploadCompleted}/${task.uploadTotal}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -152,7 +177,11 @@ class TaskCard extends StatelessWidget {
   Widget _statusBadge(AppTask task) {
     Color bg, fg;
     String label;
-    if (task.isCompleted) {
+    if (task.isUploading) {
+      bg = Brand.pendingReview.withAlpha(30);
+      fg = Colors.blue.shade700;
+      label = 'Uploading ${task.uploadCompleted}/${task.uploadTotal}';
+    } else if (task.isCompleted) {
       bg = Brand.done.withAlpha(25);
       fg = Brand.done;
       label = 'Done';

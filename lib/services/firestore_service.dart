@@ -142,6 +142,14 @@ class FirestoreService {
         .snapshots();
   }
 
+  /// The problems a reporter (usually an employee) submitted, newest first.
+  /// Single-field filter only; the caller sorts client-side.
+  Stream<QuerySnapshot> problemsReportedBy(String email) {
+    return _problemsRef
+        .where('reportedBy', isEqualTo: email)
+        .snapshots();
+  }
+
   /// The manager email an employee reports problems to = the manager that
   /// created their directory entry (employees/{email}.createdBy).
   Future<String?> managerEmailForEmployee(String employeeEmail) async {
