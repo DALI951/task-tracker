@@ -244,6 +244,7 @@ class _ProblemCard extends StatelessWidget {
       builder: (ctx) {
         String? selectedEmail;
         String? selectedName;
+        var converting = false;
         return StatefulBuilder(
           builder: (ctx, setDState) => AlertDialog(
             title: Text(context.read<SettingsService>().t('convert_to_task')),
@@ -282,23 +283,32 @@ class _ProblemCard extends StatelessWidget {
                 child: Text(context.read<SettingsService>().t('cancel')),
               ),
               ElevatedButton(
-                onPressed: () async {
-                  if (selectedEmail == null) return;
-                  final newTaskId = await provider.convertProblemToTask(
-                    problem: problem,
-                    employeeName: selectedName ?? selectedEmail!,
-                    employeeEmail: selectedEmail!,
-                  );
-                  if (newTaskId == null) {
-                    if (ctx.mounted) {
-                      toast(ctx, provider.error ?? 'Failed to create task',
-                          error: true);
-                    }
-                    return;
-                  }
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-                child: Text(context.read<SettingsService>().t('create')),
+                onPressed: converting
+                    ? null
+                    : () async {
+                        if (selectedEmail == null || converting) return;
+                        setDState(() => converting = true);
+                        final newTaskId = await provider.convertProblemToTask(
+                          problem: problem,
+                          employeeName: selectedName ?? selectedEmail!,
+                          employeeEmail: selectedEmail!,
+                        );
+                        if (!ctx.mounted) return;
+                        if (newTaskId == null) {
+                          setDState(() => converting = false);
+                          toast(ctx, provider.error ?? 'Failed to create task',
+                              error: true);
+                          return;
+                        }
+                        Navigator.pop(ctx);
+                      },
+                child: converting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(context.read<SettingsService>().t('create')),
               ),
             ],
           ),

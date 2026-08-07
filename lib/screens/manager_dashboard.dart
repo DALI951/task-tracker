@@ -443,10 +443,40 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     }
     return Column(
       children: [
-        if (!provider.connected && !provider.loading)
-          const LinearProgressIndicator(),
         if (provider.loading)
           const LinearProgressIndicator(),
+        if (!provider.connected && !provider.loading)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Brand.problem.withAlpha(20),
+                borderRadius: BorderRadius.circular(Brand.radiusMd),
+                border: Border.all(color: Brand.problem.withAlpha(50)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      provider.error ?? 'Connection lost',
+                      style: TextStyle(color: Brand.problem),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      provider.clearError();
+                      provider.listenToAllTasks();
+                      provider.listenToProblems(
+                        isManager: context.read<SettingsService>().currentRole == 'manager',
+                      );
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
           child: SizedBox(

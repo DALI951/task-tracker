@@ -112,19 +112,6 @@ class _EmployeeTasksScreenState extends State<EmployeeTasksScreen> {
       body: Column(
         children: [
           const UpdateBanner(),
-          if (provider.uploadingPhotos)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Row(children: [
-                Expanded(child: LinearProgressIndicator(
-                  value: provider.uploadTotal == 0
-                      ? null
-                      : provider.uploadCompleted / provider.uploadTotal,
-                )),
-                const SizedBox(width: 8),
-                Text('Uploading ${provider.uploadCompleted}/${provider.uploadTotal}'),
-              ]),
-            ),
           if (provider.loading && provider.error == null)
             const LinearProgressIndicator(),
           if (provider.employeeTasksError != null)

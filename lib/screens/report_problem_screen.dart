@@ -22,6 +22,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   final List<Uint8List> _photos = [];
   String? _selectedCarOrThing;
   bool _sending = false;
+  int _uploadCompleted = 0;
+  int _uploadTotal = 0;
 
   @override
   void dispose() {
@@ -46,7 +48,11 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
   Future<void> _send() async {
     if (_descCtrl.text.trim().isEmpty) return;
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _uploadCompleted = 0;
+      _uploadTotal = _photos.length;
+    });
     try {
       final user = AuthService().currentUser;
       if (user == null) return;
@@ -57,6 +63,12 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             description: _descCtrl.text.trim(),
             photos: _photos,
             carOrThing: _selectedCarOrThing,
+            onProgress: (done, total) {
+              if (mounted) setState(() {
+                _uploadCompleted = done;
+                _uploadTotal = total;
+              });
+            },
           );
       if (!mounted) return;
       if (ok) {
@@ -130,7 +142,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 itemBuilder: (_, i) => Padding(
                   padding: const EdgeInsetsDirectional.only(end: 8),
                   child: Stack(children: [
-                    Image.memory(_photos[i], width: 100, height: 100, fit: BoxFit.cover),
+                    Image.memory(_photos[i], width: 100, height: 100, fit: BoxFit.cover, cacheWidth: 200),
                     PositionedDirectional(top: 0, end: 0, child: IconButton(
                       icon: const Icon(Icons.close, color: Colors.white),
                       onPressed: () => setState(() => _photos.removeAt(i)),
@@ -146,18 +158,17 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             label: Text('${t('take_photo')} (${_photos.length}/50)'),
           ),
           const SizedBox(height: 24),
-          if (context.watch<TaskProvider>().uploadingPhotos)
+          if (_sending)
             Row(children: [
               Expanded(child: LinearProgressIndicator(
-                value: context.read<TaskProvider>().uploadTotal == 0
+                value: _uploadTotal == 0
                     ? null
-                    : context.read<TaskProvider>().uploadCompleted /
-                        context.read<TaskProvider>().uploadTotal,
+                    : _uploadCompleted / _uploadTotal,
               )),
               const SizedBox(width: 8),
-              Text('${context.read<TaskProvider>().uploadCompleted}/${context.read<TaskProvider>().uploadTotal}'),
+              Text('$_uploadCompleted/$_uploadTotal'),
             ]),
-          if (context.watch<TaskProvider>().uploadingPhotos)
+          if (_sending)
             const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,

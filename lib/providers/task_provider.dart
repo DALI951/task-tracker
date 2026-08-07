@@ -42,9 +42,16 @@ class TaskProvider extends ChangeNotifier {
   StreamSubscription? _problemSub;
   StreamSubscription? _employeeSub;
   StreamSubscription? _itemSub;
-  Timer? _restartTimer;
-  int _restartAttempts = 0;
-  static const int _maxRestartAttempts = 6;
+  final Map<String, Timer> _restartTimers = {};
+  final Map<String, int> _restartAttempts = {};
+  static const int _maxRestartAttempts = 20;
+
+  static const _kTasks = 'tasks';
+  static const _kReview = 'review';
+  static const _kProblems = 'problems';
+  static const _kPresets = 'presets';
+  static const _kEmployees = 'employees';
+  static const _kPresetItems = 'presetItems';
 
   String _t(String key) => _settings?.t(key) ?? key;
 
@@ -61,12 +68,6 @@ class TaskProvider extends ChangeNotifier {
   String? get problemsError => _problemsError;
   String? get presetsError => _presetsError;
   String? get reportError => _reportError;
-  int _uploadCompleted = 0;
-  int _uploadTotal = 0;
-  bool _uploadingPhotos = false;
-  int get uploadCompleted => _uploadCompleted;
-  int get uploadTotal => _uploadTotal;
-  bool get uploadingPhotos => _uploadingPhotos;
 
   void clearError() {
     _error = null;
@@ -86,17 +87,27 @@ class TaskProvider extends ChangeNotifier {
   // If a real-time stream dies (network blip, missing index, transient
   // rules error), re-subscribe after a short delay so the dashboard
   // recovers by itself instead of showing stale data until refresh.
-  void _scheduleRestart(void Function() resubscribe) {
-    _restartAttempts += 1;
-    if (_restartAttempts > _maxRestartAttempts) return;
-    _restartTimer?.cancel();
-    _restartTimer = Timer(const Duration(seconds: 3), () {
+  // Each stream has its own attempt budget so one failing stream cannot
+  // exhaust the retries of every other stream.
+  void _scheduleRestart(String key, void Function() resubscribe) {
+    final attempts = (_restartAttempts[key] ?? 0) + 1;
+    _restartAttempts[key] = attempts;
+    if (attempts > _maxRestartAttempts) return;
+    final seconds = attempts > 5 ? 15 : 3 * attempts;
+    _restartTimers[key]?.cancel();
+    _restartTimers[key] = Timer(Duration(seconds: seconds), () {
       if (FirebaseAuth.instance.currentUser == null) return;
       resubscribe();
     });
   }
 
-  void _resetRestartBudget() => _restartAttempts = 0;
+  void _resetRestartBudget() {
+    _restartAttempts.clear();
+    for (final t in _restartTimers.values) {
+      t.cancel();
+    }
+    _restartTimers.clear();
+  }
 
   List<AppTask> searchTasks(String query) {
     if (query.isEmpty) return _tasks;
@@ -125,9 +136,7 @@ class TaskProvider extends ChangeNotifier {
   }
 
   void stopListening() {
-    _restartTimer?.cancel();
-    _restartTimer = null;
-    _restartAttempts = 0;
+    _resetRestartBudget();
     _taskSub?.cancel();
     _taskSub = null;
     _reviewSub?.cancel();
@@ -177,7 +186,7 @@ class TaskProvider extends ChangeNotifier {
         _connected = false;
         _error = friendlyError(e);
         notifyListeners();
-        _scheduleRestart(() => listenToAllTasks(silent: true));
+        _scheduleRestart(_kTasks, () => listenToAllTasks(silent: true));
       },
     );
     _listenPresets(email);
@@ -216,7 +225,7 @@ class TaskProvider extends ChangeNotifier {
         _error = friendlyError(e);
         _employeeTasksError = friendlyError(e);
         notifyListeners();
-        _scheduleRestart(() => listenToEmployeeTasks(email, silent: true));
+        _scheduleRestart(_kTasks, () => listenToEmployeeTasks(email, silent: true));
       },
     );
   }
@@ -239,7 +248,7 @@ class TaskProvider extends ChangeNotifier {
       onError: (e) {
         _error = friendlyError(e);
         notifyListeners();
-        _scheduleRestart(listenToPendingReview);
+        _scheduleRestart(_kReview, listenToPendingReview);
       },
     );
   }
@@ -261,7 +270,7 @@ class TaskProvider extends ChangeNotifier {
         _error = friendlyError(e);
         _problemsError = friendlyError(e);
         notifyListeners();
-        _scheduleRestart(() => listenToProblems(isManager: isManager));
+        _scheduleRestart(_kProblems, () => listenToProblems(isManager: isManager));
       },
     );
   }
@@ -280,7 +289,7 @@ class TaskProvider extends ChangeNotifier {
       _error = friendlyError(e);
       _presetsError = friendlyError(e);
       notifyListeners();
-      _scheduleRestart(() => _listenPresets(createdBy));
+      _scheduleRestart(_kPresets, () => _listenPresets(createdBy));
     });
   }
 
@@ -295,7 +304,7 @@ class TaskProvider extends ChangeNotifier {
     onError: (e) {
       _error = friendlyError(e);
       notifyListeners();
-      _scheduleRestart(() => _listenEmployees(createdBy));
+      _scheduleRestart(_kEmployees, () => _listenEmployees(createdBy));
     });
   }
 
@@ -311,7 +320,7 @@ class TaskProvider extends ChangeNotifier {
     onError: (e) {
       _error = friendlyError(e);
       notifyListeners();
-      _scheduleRestart(() => _listenPresetItems(createdBy));
+      _scheduleRestart(_kPresetItems, () => _listenPresetItems(createdBy));
     });
   }
 
@@ -443,15 +452,12 @@ class TaskProvider extends ChangeNotifier {
     required String taskId,
     required List<Uint8List> images,
     String? completionDescription,
+    void Function(int completed, int total)? onProgress,
   }) async {
+    final photoUrls = <String>[];
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) { _error = 'Not signed in'; notifyListeners(); return false; }
-      _uploadCompleted = 0;
-      _uploadTotal = images.length;
-      _uploadingPhotos = true;
-      notifyListeners();
-      final photoUrls = <String>[];
       if (images.isNotEmpty) {
         await _firestore.updateTask(taskId, {
           'status': 'uploading',
@@ -470,11 +476,10 @@ class TaskProvider extends ChangeNotifier {
             'task_photos/$taskId/photo_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg',
           );
           photoUrls.add(url);
-          _uploadCompleted = i + 1;
-          notifyListeners();
+          onProgress?.call(i + 1, images.length);
           await _firestore.updateTask(taskId, {
             'photoUrls': photoUrls,
-            'uploadCompleted': _uploadCompleted,
+            'uploadCompleted': i + 1,
             'uploadTotal': images.length,
           });
         }
@@ -491,8 +496,6 @@ class TaskProvider extends ChangeNotifier {
         'rejectionReason': null,
       });
       _addHistory(taskId, 'submitted_proof', user.displayName ?? user.email ?? '');
-      _uploadingPhotos = false;
-      notifyListeners();
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
       if (task != null) {
       _notif.send(
@@ -506,7 +509,16 @@ class TaskProvider extends ChangeNotifier {
       }
       return true;
     } catch (e) {
-      _uploadingPhotos = false;
+      // Roll the task back to 'doing' so the employee keeps their buttons and
+      // the photos uploaded so far (the task is not left stuck in 'uploading').
+      try {
+        await _firestore.updateTask(taskId, {
+          'status': 'doing',
+          'uploadsComplete': true,
+          'uploadCompleted': photoUrls.length,
+          'uploadTotal': images.length,
+        });
+      } catch (_) {}
       _error = friendlyError(e);
       notifyListeners();
       return false;
@@ -583,7 +595,6 @@ class TaskProvider extends ChangeNotifier {
       _addHistory(taskId, 'withdrawn', '');
       return true;
     } catch (e) {
-      _uploadingPhotos = false;
       _error = friendlyError(e);
       notifyListeners();
       return false;
@@ -738,6 +749,7 @@ class TaskProvider extends ChangeNotifier {
     required String description,
     List<Uint8List> photos = const [],
     String? carOrThing,
+    void Function(int completed, int total)? onProgress,
   }) async {
     try {
       final role = await _userService
@@ -755,17 +767,10 @@ class TaskProvider extends ChangeNotifier {
         return false;
       }
 
-      _uploadCompleted = 0;
-      _uploadTotal = photos.length;
-      _uploadingPhotos = true;
       final photoUrls = await _storage.uploadImages(
         photos,
         'problem_photos/${reportedBy}_${DateTime.now().millisecondsSinceEpoch}',
-        onProgress: (done, total) {
-          _uploadCompleted = done;
-          _uploadTotal = total;
-          notifyListeners();
-        },
+        onProgress: onProgress,
       );
       await _firestore.addProblem({
         'reportedBy': reportedBy,
@@ -786,11 +791,8 @@ class TaskProvider extends ChangeNotifier {
         message: _t('notif_problem_reported_msg').replaceAll('{name}', reporterName),
         senderName: reporterName,
       );
-      _uploadingPhotos = false;
-      notifyListeners();
       return true;
     } catch (e) {
-      _uploadingPhotos = false;
       _error = friendlyError(e);
       _reportError = friendlyError(e);
       notifyListeners();
@@ -909,8 +911,7 @@ class TaskProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _restartTimer?.cancel();
-    _restartTimer = null;
+    _resetRestartBudget();
     _taskSub?.cancel();
     _reviewSub?.cancel();
     _presetSub?.cancel();

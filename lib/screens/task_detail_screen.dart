@@ -31,6 +31,8 @@ class TaskDetailScreen extends StatefulWidget {
 
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
   bool _uploading = false;
+  int _uploadCompleted = 0;
+  int _uploadTotal = 0;
   final List<Uint8List> _proofPhotos = [];
   late final TextEditingController _completionDescCtrl;
 
@@ -83,14 +85,30 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       toast(context, 'Add a photo or enter a description', error: true);
       return;
     }
-    setState(() => _uploading = true);
+    setState(() {
+      _uploading = true;
+      _uploadCompleted = 0;
+      _uploadTotal = _proofPhotos.length;
+    });
     try {
       final ok = await context.read<TaskProvider>().completeTaskWithProof(
         taskId: widget.task.id,
         images: _proofPhotos,
         completionDescription: _completionDescCtrl.text.trim().isEmpty ? null : _completionDescCtrl.text.trim(),
+        onProgress: (done, total) {
+          if (mounted) setState(() {
+            _uploadCompleted = done;
+            _uploadTotal = total;
+          });
+        },
       );
-      if (mounted) toast(context, ok ? t('task_completed') : context.read<TaskProvider>().error ?? t('failed'), error: !ok);
+      if (!mounted) return;
+      if (ok) {
+        toast(context, t('task_completed'));
+        Navigator.pop(context);
+      } else {
+        toast(context, context.read<TaskProvider>().error ?? t('failed'), error: true);
+      }
     } catch (e) {
       if (mounted) toast(context, friendlyError(e), error: true);
     } finally {
@@ -120,8 +138,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             imageBytes: bytes,
           );
       if (mounted) {
-        toast(context, ok ? t('task_completed') : context.read<TaskProvider>().error ?? t('failed'),
-            error: !ok);
+        if (ok) {
+          toast(context, t('task_completed'));
+          Navigator.pop(context);
+        } else {
+          toast(context, context.read<TaskProvider>().error ?? t('failed'),
+              error: true);
+        }
       }
     } catch (e) {
       if (mounted) toast(context, friendlyError(e), error: true);
@@ -576,22 +599,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             if (canComplete)
               Column(children: [
-                Consumer<TaskProvider>(
-                  builder: (_, provider, __) => provider.uploadingPhotos
-                      ? Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(children: [
-                            Expanded(child: LinearProgressIndicator(
-                              value: provider.uploadTotal == 0
-                                  ? null
-                                  : provider.uploadCompleted / provider.uploadTotal,
-                            )),
-                            const SizedBox(width: 8),
-                            Text('${provider.uploadCompleted}/${provider.uploadTotal}'),
-                          ]),
-                        )
-                      : const SizedBox.shrink(),
-                ),
+                if (_uploading)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(children: [
+                      Expanded(child: LinearProgressIndicator(
+                        value: _uploadTotal == 0
+                            ? null
+                            : _uploadCompleted / _uploadTotal,
+                      )),
+                      const SizedBox(width: 8),
+                      Text('$_uploadCompleted/$_uploadTotal'),
+                    ]),
+                  ),
                 TextField(controller: _completionDescCtrl, maxLines: 2,
                   decoration: InputDecoration(labelText: '${t('description')} (optional with photos)', border: const OutlineInputBorder())),
                 const SizedBox(height: 8),
@@ -661,7 +681,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ],
             if (!widget.isManager && task.isPendingReview)
-              OutlinedButton.icon(onPressed: _withdrawSubmission, icon: const Icon(Icons.undo), label: const Text('Withdraw submission')),
+              OutlinedButton.icon(
+                onPressed: _uploading ? null : _withdrawSubmission,
+                icon: const Icon(Icons.undo),
+                label: const Text('Withdraw submission'),
+              ),
             if (widget.isManager && !task.isCompleted && !task.isPendingReview)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -744,7 +768,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         key: ValueKey(_proofPhotos[i]),
         padding: const EdgeInsetsDirectional.only(end: 8),
         child: Stack(children: [
-          Image.memory(_proofPhotos[i], width: 84, height: 84, fit: BoxFit.cover),
+          Image.memory(_proofPhotos[i], width: 84, height: 84, fit: BoxFit.cover, cacheWidth: 168),
           PositionedDirectional(top: 0, end: 0, child: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => setState(() => _proofPhotos.removeAt(i)))),
           PositionedDirectional(bottom: 2, start: 2, child: CircleAvatar(radius: 10, child: Text('${i + 1}', style: const TextStyle(fontSize: 11)))),
         ]),
