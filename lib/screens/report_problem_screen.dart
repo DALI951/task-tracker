@@ -25,7 +25,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   bool _sending = false;
   int _uploadCompleted = 0;
   int _uploadTotal = 0;
-  String? _pendingReportDesc;
+  int _bytesSent = 0;
+  int _totalBytes = 0;
 
   @override
   void dispose() {
@@ -34,10 +35,17 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   }
 
   Future<void> _takePhoto() async {
-    final picked = await pickPhoto(context);
-    if (picked == null || _photos.length >= 50) return;
-    final bytes = await picked.readAsBytes();
-    setState(() => _photos.add(bytes));
+    final picked = await pickPhotos(context);
+    if (picked.isEmpty) return;
+    final room = 50 - _photos.length;
+    if (room <= 0) return;
+    final bytesList = <Uint8List>[];
+    for (final file in picked.take(room)) {
+      bytesList.add(await file.readAsBytes());
+    }
+    if (mounted && bytesList.isNotEmpty) {
+      setState(() => _photos.addAll(bytesList));
+    }
   }
 
   Future<void> _send() async {
@@ -46,7 +54,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
       _sending = true;
       _uploadCompleted = 0;
       _uploadTotal = _photos.length;
-      _pendingReportDesc = _descCtrl.text.trim();
+      _bytesSent = 0;
+      _totalBytes = _photos.fold<int>(0, (sum, b) => sum + b.length);
     });
     try {
       final user = AuthService().currentUser;
@@ -64,11 +73,16 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 _uploadTotal = total;
               });
             },
+            onByteProgress: (sent, total) {
+              if (mounted) setState(() {
+                _bytesSent = sent;
+                _totalBytes = total;
+              });
+            },
           );
       if (!mounted) return;
       if (ok) {
         setState(() {
-          _pendingReportDesc = null;
           _descCtrl.clear();
           _photos.clear();
           _selectedCarOrThing = null;
@@ -88,11 +102,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             backgroundColor: Colors.red,
           ),
         );
-        setState(() => _pendingReportDesc = null);
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _pendingReportDesc = null);
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
@@ -157,20 +169,26 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: _sending || _photos.length >= 50 ? null : _takePhoto,
-            icon: const Icon(Icons.camera_alt),
-            label: Text('${t('take_photo')} (${_photos.length}/50)'),
+            icon: const Icon(Icons.add_photo_alternate),
+            label: Text('Photos (${_photos.length}/50)'),
           ),
           const SizedBox(height: 24),
           if (_sending)
-            Row(children: [
-              Expanded(child: LinearProgressIndicator(
-                value: _uploadTotal == 0
-                    ? null
-                    : _uploadCompleted / _uploadTotal,
-              )),
-              const SizedBox(width: 8),
-              Text('$_uploadCompleted/$_uploadTotal'),
-            ]),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                Expanded(child: LinearProgressIndicator(
+                  value: _totalBytes == 0
+                      ? null
+                      : (_bytesSent / _totalBytes).clamp(0.0, 1.0),
+                )),
+                const SizedBox(width: 8),
+                Text(
+                  'Photo $_uploadCompleted/$_uploadTotal'
+                  '${_totalBytes == 0 ? '' : ' · ${((_bytesSent / _totalBytes) * 100).round()}%'}',
+                ),
+              ]),
+            ),
           if (_sending)
             const SizedBox(height: 8),
           SizedBox(
@@ -196,8 +214,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 ?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          if (_pendingReportDesc != null) _inFlightReportCard(),
-          if (reports.isEmpty && _pendingReportDesc == null)
+          if (reports.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Text(
@@ -208,48 +225,6 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           else
             ...reports.map((p) => _ReportStatusCard(problem: p)),
         ],
-      ),
-    );
-  }
-
-  Widget _inFlightReportCard() {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _pendingReportDesc!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 14, color: cs.onSurface),
-            ),
-            const SizedBox(height: 10),
-            Row(children: [
-              const Icon(Icons.cloud_upload, size: 18, color: Colors.blue),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: _uploadTotal == 0
-                        ? null
-                        : _uploadCompleted / _uploadTotal,
-                    minHeight: 6,
-                    backgroundColor: cs.surfaceContainerHighest,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '$_uploadCompleted/$_uploadTotal',
-                style: const TextStyle(fontSize: 12, color: Colors.blue),
-              ),
-            ]),
-          ],
-        ),
       ),
     );
   }
@@ -267,7 +242,21 @@ class _ReportStatusCard extends StatelessWidget {
     Color fg;
     IconData icon;
     String label;
-    if (problem.isResolved) {
+    final uploading = problem.isUploading && !problem.uploadsComplete;
+    if (uploading) {
+      fg = Colors.blue.shade700;
+      icon = Icons.cloud_upload;
+      final pct = problem.uploadProgress == null
+          ? ''
+          : ' · ${(problem.uploadProgress! * 100).round()}%';
+      label = 'Uploading ${problem.uploadCompleted}/${problem.uploadTotal}$pct';
+    } else if (problem.isUploading) {
+      // uploadsComplete == true but never flipped to 'open' -> it failed or
+      // the app was closed mid-send; the report never reached the manager.
+      fg = Colors.orange.shade800;
+      icon = Icons.error_outline;
+      label = 'Interrupted';
+    } else if (problem.isResolved) {
       fg = Brand.done;
       icon = Icons.check_circle;
       label = context.read<SettingsService>().t('complete');
@@ -313,6 +302,17 @@ class _ReportStatusCard extends StatelessWidget {
               dateFormat.format(problem.createdAt),
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
+            if (uploading) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: problem.uploadProgress,
+                  minHeight: 5,
+                  backgroundColor: cs.surfaceContainerHighest,
+                ),
+              ),
+            ],
           ],
         ),
       ),

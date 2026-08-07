@@ -10,6 +10,9 @@ class Problem {
   final DateTime createdAt;
   final String status;
   final String? convertedToTaskId;
+  final bool uploadsComplete;
+  final int uploadCompleted;
+  final int uploadTotal;
 
   Problem({
     required this.id,
@@ -23,11 +26,21 @@ class Problem {
     required this.createdAt,
     this.status = 'open',
     this.convertedToTaskId,
+    this.uploadsComplete = true,
+    this.uploadCompleted = 0,
+    this.uploadTotal = 0,
   });
 
   bool get isOpen => status == 'open';
   bool get isAssigned => status == 'assigned';
   bool get isResolved => status == 'resolved';
+  bool get isUploading => status == 'uploading';
+
+  /// 0..1 upload progress; null when no upload is in flight.
+  double? get uploadProgress {
+    if (!isUploading || uploadTotal <= 0) return null;
+    return (uploadCompleted / uploadTotal).clamp(0.0, 1.0);
+  }
 
   factory Problem.fromMap(Map<String, dynamic> map, String docId) {
     return Problem(
@@ -43,6 +56,9 @@ class Problem {
       createdAt: (map['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
       status: map['status'] as String? ?? 'open',
       convertedToTaskId: map['convertedToTaskId'] as String?,
+      uploadsComplete: map['uploadsComplete'] as bool? ?? true,
+      uploadCompleted: map['uploadCompleted'] as int? ?? 0,
+      uploadTotal: map['uploadTotal'] as int? ?? 0,
     );
   }
 
@@ -58,6 +74,9 @@ class Problem {
       'createdAt': createdAt,
       'status': status,
       'convertedToTaskId': convertedToTaskId,
+      'uploadsComplete': uploadsComplete,
+      'uploadCompleted': uploadCompleted,
+      'uploadTotal': uploadTotal,
     };
   }
 }

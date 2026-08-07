@@ -42,6 +42,7 @@ class _ProblemsScreenState extends State<ProblemsScreen> {
                     isDense: true,
                     items: [
                        DropdownMenuItem(value: 'open', child: Text(t('filter_open'))),
+                       DropdownMenuItem(value: 'uploading', child: const Text('Uploading')),
                        DropdownMenuItem(value: 'assigned', child: Text(t('filter_assigned'))),
                     ],
                      onChanged: (v) => setState(() => _filter = v ?? 'open'),
@@ -112,7 +113,19 @@ class _ProblemCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     Color statusBg, statusFg;
     String statusLabel;
-    if (problem.isOpen) {
+    if (problem.isUploading && !problem.uploadsComplete) {
+      statusBg = Colors.blue.withAlpha(25);
+      statusFg = Colors.blue.shade700;
+      final pct = problem.uploadProgress == null
+          ? ''
+          : ' · ${(problem.uploadProgress! * 100).round()}%';
+      statusLabel = 'Uploading ${problem.uploadCompleted}/${problem.uploadTotal}$pct';
+    } else if (problem.isUploading) {
+      // uploadsComplete but never 'open' -> the send failed or was cut short.
+      statusBg = Colors.orange.withAlpha(25);
+      statusFg = Colors.orange.shade800;
+      statusLabel = 'Interrupted';
+    } else if (problem.isOpen) {
       statusBg = Brand.problem.withAlpha(25);
       statusFg = Brand.problem;
       statusLabel = t('open');
@@ -157,6 +170,17 @@ class _ProblemCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (problem.isUploading && !problem.uploadsComplete) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: problem.uploadProgress,
+                  minHeight: 5,
+                  backgroundColor: cs.surfaceContainerHighest,
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [

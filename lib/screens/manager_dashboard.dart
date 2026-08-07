@@ -100,6 +100,7 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     _selectedPresetId = null;
     _selectedEmployeeEmail = null;
     _selectedCarOrThing = null;
+    var creating = false;
 
     UpdateService().suppressUpdates = true;
     showDialog(
@@ -230,32 +231,42 @@ class _ManagerDashboardState extends State<ManagerDashboard>
                 child: Text(t('cancel')),
               ),
               ElevatedButton(
-                onPressed: () async {
-                  if (!_formKey.currentState!.validate()) return;
-                  final emp = employees.firstWhere(
-                    (e) => e['email'] == _selectedEmployeeEmail,
-                    orElse: () => {},
-                  );
-                  final taskId = await context.read<TaskProvider>().addTask(
-                        title: _titleCtrl.text.trim(),
-                        description: _descCtrl.text.trim().isEmpty
-                            ? null
-                            : _descCtrl.text.trim(),
-                        assignedTo: emp['name'] as String? ?? '',
-                        assignedToEmail: emp['email'] as String? ?? '',
-                        carOrThing: _selectedCarOrThing,
-                        presetId: _selectedPresetId,
-                      );
-                  if (ctx.mounted) {
-                    UpdateService().suppressUpdates = false;
-                    if (taskId != null) {
-                      Navigator.pop(ctx);
-                    } else {
-                      toast(context, context.read<TaskProvider>().error ?? t('failed'), error: true);
-                    }
-                  }
-                },
-                child: Text(t('create')),
+                onPressed: creating
+                    ? null
+                    : () async {
+                        if (creating) return;
+                        if (!_formKey.currentState!.validate()) return;
+                        setDialogState(() => creating = true);
+                        final emp = employees.firstWhere(
+                          (e) => e['email'] == _selectedEmployeeEmail,
+                          orElse: () => {},
+                        );
+                        final taskId = await context.read<TaskProvider>().addTask(
+                              title: _titleCtrl.text.trim(),
+                              description: _descCtrl.text.trim().isEmpty
+                                  ? null
+                                  : _descCtrl.text.trim(),
+                              assignedTo: emp['name'] as String? ?? '',
+                              assignedToEmail: emp['email'] as String? ?? '',
+                              carOrThing: _selectedCarOrThing,
+                              presetId: _selectedPresetId,
+                            );
+                        if (ctx.mounted) {
+                          UpdateService().suppressUpdates = false;
+                          if (taskId != null) {
+                            Navigator.pop(ctx);
+                          } else {
+                            toast(context, context.read<TaskProvider>().error ?? t('failed'), error: true);
+                          }
+                        }
+                      },
+                child: creating
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(t('create')),
               ),
             ],
           );
@@ -270,7 +281,10 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     final settings = context.watch<SettingsService>();
     final provider = context.watch<TaskProvider>();
     final unresolvedProblemCount = provider.problems
-        .where((problem) => problem.status == 'open' || problem.status == 'assigned')
+        .where((problem) =>
+            problem.status == 'open' ||
+            problem.status == 'assigned' ||
+            problem.status == 'uploading')
         .length;
 
     return Scaffold(
@@ -407,7 +421,12 @@ class _ManagerDashboardState extends State<ManagerDashboard>
     final pending = allTasks.where((x) => x.isPending).length;
     final doing = allTasks.where((x) => x.isDoing).length;
     final review = allTasks.where((x) => x.isPendingReview).length;
-    final problemCount = provider.problems.where((p) => p.status == 'open' || p.status == 'assigned').length;
+    final problemCount = provider.problems
+        .where((p) =>
+            p.status == 'open' ||
+            p.status == 'assigned' ||
+            p.status == 'uploading')
+        .length;
 
     if (filtered.isEmpty && allTasks.isEmpty) {
       if (provider.loading) {

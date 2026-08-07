@@ -56,9 +56,16 @@ class TaskProvider extends ChangeNotifier {
   static const _kEmployees = 'employees';
   static const _kPresetItems = 'presetItems';
 
-  String? _cancelTaskId;
-  bool _uploadCancelled = false;
-  bool get lastUploadCancelled => _uploadCancelled;
+  /// Tasks the employee asked to stop mid-upload (per-task scope: stopping
+  /// one task must never cancel another task's upload).
+  final Set<String> _cancelledTaskIds = {};
+
+  /// The status a task had before its upload started, used to roll it back
+  /// when the upload is stopped or fails.
+  final Map<String, String> _uploadFromStatus = {};
+
+  bool _lastUploadCancelled = false;
+  bool get lastUploadCancelled => _lastUploadCancelled;
 
   String _t(String key) => _settings?.t(key) ?? key;
 
@@ -497,14 +504,21 @@ class TaskProvider extends ChangeNotifier {
     required String taskId,
     required List<Uint8List> images,
     String? completionDescription,
+    /// Manager completing the task themselves: the task goes straight to
+    /// 'completed' (with approval recorded) instead of 'pending_review'.
+    bool approveDirectly = false,
     void Function(int completed, int total)? onProgress,
+    void Function(int bytesSent, int totalBytes)? onByteProgress,
   }) async {
     final photoUrls = <String>[];
-    _uploadCancelled = false;
-    _cancelTaskId = null;
+    _cancelledTaskIds.remove(taskId);
+    _lastUploadCancelled = false;
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) { _error = 'Not signed in'; notifyListeners(); return false; }
+      final current = _tasks.where((t) => t.id == taskId).firstOrNull;
+      final previousStatus = current?.status ?? (approveDirectly ? 'pending' : 'doing');
+      _uploadFromStatus[taskId] = previousStatus;
       if (images.isNotEmpty) {
         await _firestore.updateTask(taskId, {
           'status': 'uploading',
@@ -517,35 +531,36 @@ class TaskProvider extends ChangeNotifier {
           'completedAt': null,
           'rejectionReason': null,
         });
-        for (var i = 0; i < images.length; i++) {
-          if (_uploadCancelled && _cancelTaskId == taskId) {
-            // Employee pressed Stop: keep the photos uploaded so far, return
-            // the task to 'doing' so its buttons come back.
-            try {
-              await _firestore.updateTask(taskId, {
-                'status': 'doing',
-                'uploadsComplete': true,
-                'uploadCompleted': photoUrls.length,
-                'uploadTotal': images.length,
-              });
-            } catch (_) {}
-            return false;
-          }
-          final url = await _storage.uploadImage(
-            images[i],
-            'task_photos/$taskId/photo_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg',
-          );
-          photoUrls.add(url);
-          onProgress?.call(i + 1, images.length);
-          await _firestore.updateTask(taskId, {
-            'photoUrls': photoUrls,
-            'uploadCompleted': i + 1,
-            'uploadTotal': images.length,
-          });
-        }
+        // Each photo completes -> keep the document's photoUrls + counters in
+        // sync (so both roles see live progress), unless the employee pressed
+        // Stop, which aborts the whole upload via the thrown marker.
+        final urls = await _storage.uploadImages(
+          images,
+          'task_photos/$taskId',
+          onProgress: (done, total, urlsSoFar) {
+            photoUrls
+              ..clear()
+              ..addAll(urlsSoFar);
+            if (_cancelledTaskIds.contains(taskId)) {
+              throw const _UploadCancelledException();
+            }
+            onProgress?.call(done, total);
+            unawaited(_firestore
+                .updateTask(taskId, {
+                  'photoUrls': urlsSoFar,
+                  'uploadCompleted': done,
+                  'uploadTotal': total,
+                })
+                .catchError((_) {}));
+          },
+          onByteProgress: onByteProgress,
+        );
+        photoUrls
+          ..clear()
+          ..addAll(urls);
       }
       await _firestore.updateTask(taskId, {
-        'status': 'pending_review',
+        'status': approveDirectly ? 'completed' : 'pending_review',
         'photoUrl': photoUrls.isEmpty ? null : photoUrls.first,
         'photoUrls': photoUrls,
         'completionDescription': completionDescription,
@@ -553,34 +568,55 @@ class TaskProvider extends ChangeNotifier {
         'uploadCompleted': photoUrls.length,
         'uploadTotal': images.length,
         'completedAt': DateTime.now(),
+        'approvedBy': approveDirectly ? user.email : null,
         'rejectionReason': null,
       });
-      _addHistory(taskId, 'submitted_proof', user.displayName ?? user.email ?? '');
+      _uploadFromStatus.remove(taskId);
+      _cancelledTaskIds.remove(taskId);
+      _addHistory(taskId, approveDirectly ? 'approved' : 'submitted_proof', '');
       final task = _tasks.where((t) => t.id == taskId).firstOrNull;
       if (task != null) {
-      _notif.send(
-        recipientEmail: task.createdBy,
-        type: 'task_submitted',
-        title: _t('notify_task_submitted'),
-        message: '${_t('notif_task_submitted_msg')} "${task.title}"'.replaceAll('{name}', await _userService.getDisplayName(user.email ?? '')),
-        relatedId: taskId,
-        senderName: await _userService.getDisplayName(user.email ?? ''),
-      );
+        if (approveDirectly) {
+          _notif.send(
+            recipientEmail: task.assignedToEmail,
+            type: 'task_approved',
+            title: _t('notify_task_approved'),
+            message: '"${task.title}" ${_t('notif_task_approved_msg')}',
+            relatedId: taskId,
+            senderName: await _userService.getDisplayName(user.email ?? ''),
+          );
+        } else {
+          _notif.send(
+            recipientEmail: task.createdBy,
+            type: 'task_submitted',
+            title: _t('notify_task_submitted'),
+            message: '${_t('notif_task_submitted_msg')} "${task.title}"'.replaceAll('{name}', await _userService.getDisplayName(user.email ?? '')),
+            relatedId: taskId,
+            senderName: await _userService.getDisplayName(user.email ?? ''),
+          );
+        }
       }
       return true;
     } catch (e) {
-      // Roll the task back to 'doing' so the employee keeps their buttons and
-      // the photos uploaded so far (the task is not left stuck in 'uploading').
+      // Roll the task back to its previous status so the buttons come back
+      // and the photos uploaded so far stay on the document (the task is
+      // never left stuck in 'uploading').
+      final wasCancelled = e is _UploadCancelledException;
+      if (wasCancelled) _lastUploadCancelled = true;
+      final previous = _uploadFromStatus.remove(taskId) ?? 'doing';
+      _cancelledTaskIds.remove(taskId);
       try {
         await _firestore.updateTask(taskId, {
-          'status': 'doing',
+          'status': previous,
           'uploadsComplete': true,
           'uploadCompleted': photoUrls.length,
           'uploadTotal': images.length,
         });
       } catch (_) {}
-      _error = friendlyError(e);
-      notifyListeners();
+      if (!wasCancelled) {
+        _error = friendlyError(e);
+        notifyListeners();
+      }
       return false;
     }
   }
@@ -642,15 +678,23 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  /// Employee pressed Stop during a photo upload: flags the running
+  /// Employee pressed Stop during a photo upload: flags that task's running
   /// `completeTaskWithProof` loop to halt and immediately returns the task
-  /// to 'doing' (photos uploaded so far are kept on the document).
+  /// to the status it had before the upload (photos uploaded so far are kept
+  /// on the document). Other tasks' uploads are unaffected.
   void cancelUpload(String taskId) {
-    _cancelTaskId = taskId;
-    _uploadCancelled = true;
+    _cancelledTaskIds.add(taskId);
+    _lastUploadCancelled = true;
+    final current = _tasks.where((t) => t.id == taskId).firstOrNull;
+    final previous = _uploadFromStatus[taskId] ??
+        (current?.isDoing == true
+            ? 'doing'
+            : current?.isPending == true
+                ? 'pending'
+                : 'doing');
     try {
       _firestore.updateTask(taskId, {
-        'status': 'doing',
+        'status': previous,
         'uploadsComplete': true,
       });
     } catch (_) {}
@@ -824,7 +868,9 @@ class TaskProvider extends ChangeNotifier {
     List<Uint8List> photos = const [],
     String? carOrThing,
     void Function(int completed, int total)? onProgress,
+    void Function(int bytesSent, int totalBytes)? onByteProgress,
   }) async {
+    String? problemId;
     try {
       final role = await _userService
           .getRole(FirebaseAuth.instance.currentUser?.uid ?? '');
@@ -841,22 +887,52 @@ class TaskProvider extends ChangeNotifier {
         return false;
       }
 
-      final photoUrls = await _storage.uploadImages(
-        photos,
-        'problem_photos/${reportedBy}_${DateTime.now().millisecondsSinceEpoch}',
-        onProgress: onProgress,
-      );
-      await _firestore.addProblem({
+      // The report document is created FIRST (status 'uploading') so the
+      // manager sees it immediately and the employee's "My Reports" list
+      // survives an app restart mid-upload — photos are attached after.
+      problemId = await _firestore.addProblem({
         'reportedBy': reportedBy,
         'reporterName': reporterName,
         'description': description,
-        'photoUrl': photoUrls.isEmpty ? null : photoUrls.first,
-        'photoUrls': photoUrls,
+        'photoUrl': null,
+        'photoUrls': <String>[],
         'carOrThing': carOrThing,
         'managerEmail': managerEmail,
         'createdAt': DateTime.now(),
-        'status': 'open',
+        'status': 'uploading',
+        'uploadsComplete': false,
+        'uploadCompleted': 0,
+        'uploadTotal': photos.length,
         'convertedToTaskId': null,
+      });
+      final docId = problemId;
+      if (photos.isNotEmpty) {
+        final urls = await _storage.uploadImages(
+          photos,
+          'problem_photos/${reportedBy}_${DateTime.now().millisecondsSinceEpoch}',
+          onProgress: (done, total, urlsSoFar) {
+            onProgress?.call(done, total);
+            unawaited(_firestore
+                .updateProblem(docId, {
+                  'photoUrls': urlsSoFar,
+                  'uploadCompleted': done,
+                  'uploadTotal': total,
+                })
+                .catchError((_) {}));
+          },
+          onByteProgress: onByteProgress,
+        );
+        await _firestore.updateProblem(problemId, {
+          'photoUrl': urls.isEmpty ? null : urls.first,
+          'photoUrls': urls,
+          'uploadCompleted': urls.length,
+          'uploadTotal': photos.length,
+        });
+      }
+      // Publish: the report is fully uploaded, so it becomes 'open'.
+      await _firestore.updateProblem(problemId, {
+        'status': 'open',
+        'uploadsComplete': true,
       });
       _notif.send(
         recipientEmail: managerEmail,
@@ -867,6 +943,13 @@ class TaskProvider extends ChangeNotifier {
       );
       return true;
     } catch (e) {
+      // Mark the report as interrupted (photos uploaded so far stay visible)
+      // so the employee's list can show why it did not go through.
+      if (problemId != null) {
+        try {
+          await _firestore.updateProblem(problemId, {'uploadsComplete': true});
+        } catch (_) {}
+      }
       _error = friendlyError(e);
       _reportError = friendlyError(e);
       notifyListeners();
@@ -995,4 +1078,11 @@ class TaskProvider extends ChangeNotifier {
     _itemSub?.cancel();
     super.dispose();
   }
+}
+
+/// Thrown from the upload progress callback when the employee pressed Stop;
+/// `completeTaskWithProof` treats it as a clean cancellation (rolls the task
+/// back to its previous status) instead of a failure.
+class _UploadCancelledException implements Exception {
+  const _UploadCancelledException();
 }

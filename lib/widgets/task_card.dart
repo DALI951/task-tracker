@@ -76,7 +76,8 @@ class TaskCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${task.uploadCompleted}/${task.uploadTotal}',
+                            '${task.uploadCompleted}/${task.uploadTotal}'
+                            '${task.uploadProgress == null ? '' : ' · ${(task.uploadProgress! * 100).round()}%'}',
                             style: TextStyle(
                               fontSize: 11,
                               color: cs.onSurfaceVariant,
@@ -180,7 +181,10 @@ class TaskCard extends StatelessWidget {
     if (task.isUploading) {
       bg = Brand.pendingReview.withAlpha(30);
       fg = Colors.blue.shade700;
-      label = 'Uploading ${task.uploadCompleted}/${task.uploadTotal}';
+      final pct = task.uploadProgress == null
+          ? ''
+          : ' · ${(task.uploadProgress! * 100).round()}%';
+      label = 'Uploading ${task.uploadCompleted}/${task.uploadTotal}$pct';
     } else if (task.isCompleted) {
       bg = Brand.done.withAlpha(25);
       fg = Brand.done;

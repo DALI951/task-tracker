@@ -66,3 +66,59 @@ Future<XFile?> pickPhoto(BuildContext context) async {
     maxHeight: maxDim,
   );
 }
+
+/// Picks one or more photos. On Android the user chooses between the camera
+/// (single shot) and the device gallery (multi-select); the web build and
+/// desktop always open the gallery (multi-select with single-pick fallback).
+Future<List<XFile>> pickPhotos(BuildContext context) async {
+  final maxDim = await pickerMaxDimension();
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    return _multiOrSingle(ImageSource.gallery, maxDim);
+  }
+  final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Take a photo'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Choose from device'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ) ??
+      ImageSource.camera;
+  if (source == ImageSource.camera) {
+    final single = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: maxDim,
+      maxHeight: maxDim,
+    );
+    return single == null ? const [] : [single];
+  }
+  return _multiOrSingle(source, maxDim);
+}
+
+Future<List<XFile>> _multiOrSingle(ImageSource source, double maxDim) async {
+  try {
+    return await ImagePicker().pickMultiImage(
+      maxWidth: maxDim,
+      maxHeight: maxDim,
+    );
+  } catch (_) {
+    final single = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: maxDim,
+      maxHeight: maxDim,
+    );
+    return single == null ? const [] : [single];
+  }
+}

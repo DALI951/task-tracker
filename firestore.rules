@@ -129,6 +129,18 @@ service cloud.firestore {
       // list with upload status).
       allow read: if isAuth() && resource.data.reportedBy == userEmail();
 
+      // The reporter may update their own problem while it is being uploaded
+      // (progress fields, partial photoUrls). It may only flip to 'open' once
+      // the upload is complete — mirrors the task employee-update rule so a
+      // half-uploaded report can never be presented as delivered.
+      allow update: if isAuth() && resource.data.reportedBy == userEmail()
+        && resource.data.status == 'uploading'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['photoUrl', 'photoUrls', 'uploadsComplete',
+                    'uploadCompleted', 'uploadTotal', 'status'])
+        && (request.resource.data.status != 'open'
+            || request.resource.data.uploadsComplete == true);
+
       allow update, delete: if isAuth() && isManager(request.auth.uid)
         && resource.data.managerEmail == userEmail();
     }

@@ -124,8 +124,9 @@ class FirestoreService {
         .snapshots();
   }
 
-  Future<void> addProblem(Map<String, dynamic> data) async {
-    await _problemsRef.add(data);
+  Future<String> addProblem(Map<String, dynamic> data) async {
+    final ref = await _problemsRef.add(data);
+    return ref.id;
   }
 
   Future<void> updateProblem(String id, Map<String, dynamic> data) async {

@@ -32,6 +32,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   bool _uploading = false;
   int _uploadCompleted = 0;
   int _uploadTotal = 0;
+  int _bytesSent = 0;
+  int _totalBytes = 0;
   final List<Uint8List> _proofPhotos = [];
   late final TextEditingController _completionDescCtrl;
 
@@ -63,12 +65,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _pickProofPhoto() async {
-    final picked = await pickPhoto(context);
-    if (picked == null) return;
-
-    if (_proofPhotos.length >= 50) return;
-    final bytes = await picked.readAsBytes();
-    if (mounted) setState(() => _proofPhotos.add(bytes));
+    final picked = await pickPhotos(context);
+    if (picked.isEmpty) return;
+    final room = 50 - _proofPhotos.length;
+    if (room <= 0) return;
+    final bytesList = <Uint8List>[];
+    for (final file in picked.take(room)) {
+      bytesList.add(await file.readAsBytes());
+    }
+    if (mounted && bytesList.isNotEmpty) {
+      setState(() => _proofPhotos.addAll(bytesList));
+    }
   }
 
   Future<void> _submitProof() async {
@@ -80,16 +87,27 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       _uploading = true;
       _uploadCompleted = 0;
       _uploadTotal = _proofPhotos.length;
+      _bytesSent = 0;
+      _totalBytes =
+          _proofPhotos.fold<int>(0, (sum, b) => sum + b.length);
     });
     try {
       final ok = await context.read<TaskProvider>().completeTaskWithProof(
         taskId: widget.task.id,
         images: _proofPhotos,
         completionDescription: _completionDescCtrl.text.trim().isEmpty ? null : _completionDescCtrl.text.trim(),
+        // Managers complete the task outright (no review step).
+        approveDirectly: widget.isManager,
         onProgress: (done, total) {
           if (mounted) setState(() {
             _uploadCompleted = done;
             _uploadTotal = total;
+          });
+        },
+        onByteProgress: (sent, total) {
+          if (mounted) setState(() {
+            _bytesSent = sent;
+            _totalBytes = total;
           });
         },
       );
@@ -102,35 +120,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         toast(context, 'Upload stopped');
       } else {
         toast(context, provider.error ?? t('failed'), error: true);
-      }
-    } catch (e) {
-      if (mounted) toast(context, friendlyError(e), error: true);
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
-  }
-
-  Future<void> _completeAsManager() async {
-    final picked = await pickPhoto(context);
-    if (picked == null) return;
-
-    setState(() => _uploading = true);
-    try {
-      if (!mounted) return;
-      final bytes = await picked.readAsBytes();
-      if (!mounted) return;
-      final ok = await context.read<TaskProvider>().completeTaskDirectly(
-            taskId: widget.task.id,
-            imageBytes: bytes,
-          );
-      if (mounted) {
-        if (ok) {
-          toast(context, t('task_completed'));
-          Navigator.pop(context);
-        } else {
-          toast(context, context.read<TaskProvider>().error ?? t('failed'),
-              error: true);
-        }
       }
     } catch (e) {
       if (mounted) toast(context, friendlyError(e), error: true);
@@ -399,10 +388,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
     final canStart =
         task.isPending && !widget.isManager && task.assignedToEmail == userEmail;
-    final canComplete =
-        task.isDoing && task.claimedBy == userEmail;
+    final canComplete = task.isDoing && task.claimedBy == userEmail;
     final canCompleteAsManager =
         widget.isManager && (task.isPending || task.isDoing);
+    final canUseCompletionPanel = canComplete || canCompleteAsManager;
+
+    // Smooth local byte progress while this screen is submitting; the
+    // document's per-photo counters otherwise (task card, other device).
+    final localFraction = _totalBytes == 0
+        ? null
+        : (_bytesSent / _totalBytes).clamp(0.0, 1.0);
+    final displayFraction = _uploading ? localFraction : task.uploadProgress;
+    String pctLabel(double? fraction) =>
+        fraction == null ? '' : ' · ${(fraction * 100).round()}%';
 
     return Scaffold(
       appBar: AppBar(
@@ -432,6 +430,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -607,7 +606,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
-                              value: task.uploadProgress,
+                              value: displayFraction ?? task.uploadProgress,
                               minHeight: 6,
                               backgroundColor: cs.surfaceContainerHighest,
                             ),
@@ -615,7 +614,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '${task.uploadCompleted}/${task.uploadTotal}',
+                          '${task.uploadCompleted}/${task.uploadTotal}'
+                          '${pctLabel(displayFraction ?? task.uploadProgress)}',
                           style: const TextStyle(
                               fontSize: 12, color: Colors.blue),
                         ),
@@ -626,17 +626,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       '${t('uploading')} ${t('proof_photo')}…',
                       style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                     ),
-                    if (!widget.isManager) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _stopUpload,
-                          icon: const Icon(Icons.stop_circle_outlined),
-                          label: Text(t('stop_upload')),
-                        ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _stopUpload,
+                        icon: const Icon(Icons.stop_circle_outlined),
+                        label: Text(t('stop_upload')),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
@@ -651,53 +649,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   label: Text(t('start_task')),
                 ),
               ),
-            if (canComplete)
-              Column(children: [
-                if (_uploading)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(children: [
-                      Expanded(child: LinearProgressIndicator(
-                        value: _uploadTotal == 0
-                            ? null
-                            : _uploadCompleted / _uploadTotal,
-                      )),
-                      const SizedBox(width: 8),
-                      Text('$_uploadCompleted/$_uploadTotal'),
-                    ]),
-                  ),
-                TextField(controller: _completionDescCtrl, maxLines: 2,
-                  decoration: InputDecoration(labelText: '${t('description')} (optional with photos)', border: const OutlineInputBorder())),
-                const SizedBox(height: 8),
-                if (_proofPhotos.isNotEmpty) _proofPhotoEditor(),
-                Row(children: [
-                  Expanded(child: OutlinedButton.icon(onPressed: _uploading || _proofPhotos.length >= 50 ? null : _pickProofPhoto,
-                    icon: const Icon(Icons.add_photo_alternate), label: Text('Photos (${_proofPhotos.length}/50)'))),
-                  const SizedBox(width: 8),
-                  Expanded(child: ElevatedButton.icon(onPressed: _uploading ? null : _submitProof,
-                  icon: _uploading
-                      ? const SizedBox(
-                          width: 20, height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.camera_alt),
-                  label: Text(_uploading ? t('uploading') : t('send')))),
-                ]),
-              ]),
-            if (canCompleteAsManager && !task.isCompleted)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _uploading ? null : _completeAsManager,
-                  icon: _uploading
-                      ? const SizedBox(
-                          width: 20, height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.camera_alt),
-                  label: Text(_uploading ? t('uploading') : t('complete_with_photo')),
-                ),
-              ),
+            if (canUseCompletionPanel)
+              _completionPanel(task, pctLabel),
             if (widget.isManager && task.isPendingReview) ...[
               const SizedBox(height: 8),
               Row(
@@ -808,6 +761,50 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
+  /// Completion form shared by employees (submits for review) and managers
+  /// (completes the task directly): description + multiple photos with a
+  /// smooth byte-level progress bar while sending.
+  Widget _completionPanel(AppTask task, String Function(double?) pctLabel) {
+    final cs = Theme.of(context).colorScheme;
+    final localFraction = _totalBytes == 0
+        ? null
+        : (_bytesSent / _totalBytes).clamp(0.0, 1.0);
+    return Column(children: [
+      if (_uploading)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(children: [
+            Expanded(child: LinearProgressIndicator(value: localFraction)),
+            const SizedBox(width: 8),
+            Text(
+              'Photo $_uploadCompleted/$_uploadTotal${pctLabel(localFraction)}',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ]),
+        ),
+      TextField(controller: _completionDescCtrl, maxLines: 2,
+        decoration: InputDecoration(labelText: '${t('description')} (optional with photos)', border: const OutlineInputBorder())),
+      const SizedBox(height: 8),
+      if (_proofPhotos.isNotEmpty) ...[
+        _proofPhotoEditor(),
+        const SizedBox(height: 8),
+      ],
+      Row(children: [
+        Expanded(child: OutlinedButton.icon(onPressed: _uploading || _proofPhotos.length >= 50 ? null : _pickProofPhoto,
+          icon: const Icon(Icons.add_photo_alternate), label: Text('Photos (${_proofPhotos.length}/50)'))),
+        const SizedBox(width: 8),
+        Expanded(child: ElevatedButton.icon(onPressed: _uploading ? null : _submitProof,
+        icon: _uploading
+            ? const SizedBox(
+                width: 20, height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.check_circle_outline),
+        label: Text(_uploading ? t('uploading') : (widget.isManager ? t('complete') : t('send'))))),
+      ]),
+    ]);
+  }
+
   Widget _proofPhotoEditor() => SizedBox(
     height: 84,
     child: ReorderableListView.builder(
@@ -852,7 +849,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       bg = Colors.blue.withAlpha(25);
       fg = Colors.blue.shade700;
       icon = Icons.cloud_upload;
-      label = '${t('uploading')} ${task.uploadCompleted}/${task.uploadTotal}';
+      final pct = task.uploadProgress == null
+          ? ''
+          : ' · ${(task.uploadProgress! * 100).round()}%';
+      label = '${t('uploading')} ${task.uploadCompleted}/${task.uploadTotal}$pct';
     } else if (task.isCompleted) {
       bg = Brand.done.withAlpha(25);
       fg = Brand.done;
