@@ -9,6 +9,7 @@ import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/screens/problems_screen.dart';
 import 'package:task_tracker/screens/task_detail_screen.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/update_download_manager.dart';
 
 final FlutterLocalNotificationsPlugin _localNotifications =
     FlutterLocalNotificationsPlugin();
@@ -100,6 +101,19 @@ class PushNotificationService {
         }
       },
     );
+
+    // The app can be launched cold by the "Ready to install" notification's
+    // Install action; the plugin reports that launch here.
+    final launchDetails =
+        await _localNotifications.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp == true) {
+      final payload = launchDetails?.notificationResponse?.payload;
+      if (payload != null) {
+        try {
+          _handleNotificationTap(json.decode(payload));
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> _saveToken() async {
@@ -150,6 +164,14 @@ class PushNotificationService {
   void _handleNotificationTap(Map<String, dynamic> data) {
     final type = data['type'] as String?;
     final relatedId = data['relatedId'] as String?;
+
+    // The update notification's Install action: open the package installer
+    // directly (no navigator needed; works even on a cold start).
+    if (type == 'update_install') {
+      UpdateDownloadManager().install();
+      return;
+    }
+
     if (_navigator == null || type == null) return;
 
     final isManager = _settings?.currentRole == 'manager';

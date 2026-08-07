@@ -7,12 +7,16 @@ import 'package:task_tracker/models/preset_item.dart';
 import 'package:task_tracker/models/preset_task.dart';
 import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/models/task.dart';
+import 'package:task_tracker/services/background_worker.dart';
 import 'package:task_tracker/services/firestore_service.dart';
 import 'package:task_tracker/services/notification_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/storage_service.dart';
+import 'package:task_tracker/services/upload_finalizer.dart';
+import 'package:task_tracker/services/upload_session.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
+import 'package:workmanager/workmanager.dart';
 
 class TaskProvider extends ChangeNotifier {
   final FirestoreService _firestore = FirestoreService();
@@ -63,6 +67,14 @@ class TaskProvider extends ChangeNotifier {
   /// The status a task had before its upload started, used to roll it back
   /// when the upload is stopped or fails.
   final Map<String, String> _uploadFromStatus = {};
+
+  /// While the app is open, pollers keep the in-app byte progress callbacks
+  /// firing from the session state file the background worker writes.
+  final Map<String, Timer> _sessionPollers = {};
+  final Map<String, void Function(int, int)?> _sessionOnProgress = {};
+  final Map<String, void Function(int, int)?> _sessionOnByteProgress = {};
+  final Map<String, int> _sessionLastProgress = {};
+  final Map<String, int> _sessionLastBytes = {};
 
   bool _lastUploadCancelled = false;
   bool get lastUploadCancelled => _lastUploadCancelled;
@@ -531,72 +543,59 @@ class TaskProvider extends ChangeNotifier {
           'completedAt': null,
           'rejectionReason': null,
         });
-        // Each photo completes -> keep the document's photoUrls + counters in
-        // sync (so both roles see live progress), unless the employee pressed
-        // Stop, which aborts the whole upload via the thrown marker.
-        final urls = await _storage.uploadImages(
-          images,
-          'task_photos/$taskId',
-          onProgress: (done, total, urlsSoFar) {
-            photoUrls
-              ..clear()
-              ..addAll(urlsSoFar);
-            if (_cancelledTaskIds.contains(taskId)) {
-              throw const _UploadCancelledException();
-            }
-            onProgress?.call(done, total);
-            unawaited(_firestore
-                .updateTask(taskId, {
-                  'photoUrls': urlsSoFar,
-                  'uploadCompleted': done,
-                  'uploadTotal': total,
-                })
-                .catchError((_) {}));
-          },
-          onByteProgress: onByteProgress,
-        );
-        photoUrls
-          ..clear()
-          ..addAll(urls);
-      }
-      await _firestore.updateTask(taskId, {
-        'status': approveDirectly ? 'completed' : 'pending_review',
-        'photoUrl': photoUrls.isEmpty ? null : photoUrls.first,
-        'photoUrls': photoUrls,
-        'completionDescription': completionDescription,
-        'uploadsComplete': true,
-        'uploadCompleted': photoUrls.length,
-        'uploadTotal': images.length,
-        'completedAt': DateTime.now(),
-        'approvedBy': approveDirectly ? user.email : null,
-        'rejectionReason': null,
-      });
-      _uploadFromStatus.remove(taskId);
-      _cancelledTaskIds.remove(taskId);
-      _addHistory(taskId, approveDirectly ? 'approved' : 'submitted_proof', '');
-      final task = _tasks.where((t) => t.id == taskId).firstOrNull;
-      if (task != null) {
-        if (approveDirectly) {
-          _notif.send(
-            recipientEmail: task.assignedToEmail,
-            type: 'task_approved',
-            title: _t('notify_task_approved'),
-            message: '"${task.title}" ${_t('notif_task_approved_msg')}',
-            relatedId: taskId,
-            senderName: await _userService.getDisplayName(user.email ?? ''),
+        if (kIsWeb) {
+          // Web has no background workers: upload in-process with the
+          // per-photo document sync + Stop support.
+          final urls = await _storage.uploadImages(
+            images,
+            'task_photos/$taskId',
+            onProgress: (done, total, urlsSoFar) {
+              photoUrls
+                ..clear()
+                ..addAll(urlsSoFar);
+              if (_cancelledTaskIds.contains(taskId)) {
+                throw const _UploadCancelledException();
+              }
+              onProgress?.call(done, total);
+              unawaited(_firestore
+                  .updateTask(taskId, {
+                    'photoUrls': urlsSoFar,
+                    'uploadCompleted': done,
+                    'uploadTotal': total,
+                  })
+                  .catchError((_) {}));
+            },
+            onByteProgress: onByteProgress,
           );
+          photoUrls
+            ..clear()
+            ..addAll(urls);
         } else {
-          _notif.send(
-            recipientEmail: task.createdBy,
-            type: 'task_submitted',
-            title: _t('notify_task_submitted'),
-            message: '${_t('notif_task_submitted_msg')} "${task.title}"'.replaceAll('{name}', await _userService.getDisplayName(user.email ?? '')),
-            relatedId: taskId,
-            senderName: await _userService.getDisplayName(user.email ?? ''),
+          // Native: hand the photos to a Workmanager background task so the
+          // upload survives the app being backgrounded or killed. Returns
+          // immediately; the worker drives progress and the final flip.
+          return await _startTaskUploadSession(
+            taskId: taskId,
+            images: images,
+            previousStatus: previousStatus,
+            approveDirectly: approveDirectly,
+            completionDescription: completionDescription,
+            user: user,
+            current: current,
+            onProgress: onProgress,
+            onByteProgress: onByteProgress,
           );
         }
       }
-      return true;
+      return await _completeTaskFinalWrite(
+        taskId: taskId,
+        photoUrls: photoUrls,
+        imagesLength: images.length,
+        completionDescription: completionDescription,
+        approveDirectly: approveDirectly,
+        user: user,
+        current: current,
+      );
     } catch (e) {
       // Roll the task back to its previous status so the buttons come back
       // and the photos uploaded so far stay on the document (the task is
@@ -619,6 +618,111 @@ class TaskProvider extends ChangeNotifier {
       }
       return false;
     }
+  }
+
+  /// Final task write for submissions that were uploaded in-process (web or
+  /// no photos): flips the status, records approval, history + pushes.
+  Future<bool> _completeTaskFinalWrite({
+    required String taskId,
+    required List<String> photoUrls,
+    required int imagesLength,
+    required String? completionDescription,
+    required bool approveDirectly,
+    required User user,
+    required AppTask? current,
+  }) async {
+    await _firestore.updateTask(taskId, {
+      'status': approveDirectly ? 'completed' : 'pending_review',
+      'photoUrl': photoUrls.isEmpty ? null : photoUrls.first,
+      'photoUrls': photoUrls,
+      'completionDescription': completionDescription,
+      'uploadsComplete': true,
+      'uploadCompleted': photoUrls.length,
+      'uploadTotal': imagesLength,
+      'completedAt': DateTime.now(),
+      'approvedBy': approveDirectly ? user.email : null,
+      'rejectionReason': null,
+    });
+    _uploadFromStatus.remove(taskId);
+    _cancelledTaskIds.remove(taskId);
+    _addHistory(taskId, approveDirectly ? 'approved' : 'submitted_proof', '');
+    final task = current ?? _tasks.where((t) => t.id == taskId).firstOrNull;
+    if (task != null) {
+      if (approveDirectly) {
+        _notif.send(
+          recipientEmail: task.assignedToEmail,
+          type: 'task_approved',
+          title: _t('notify_task_approved'),
+          message: '"${task.title}" ${_t('notif_task_approved_msg')}',
+          relatedId: taskId,
+          senderName: await _userService.getDisplayName(user.email ?? ''),
+        );
+      } else {
+        _notif.send(
+          recipientEmail: task.createdBy,
+          type: 'task_submitted',
+          title: _t('notify_task_submitted'),
+          message: '${_t('notif_task_submitted_msg')} "${task.title}"'.replaceAll('{name}', await _userService.getDisplayName(user.email ?? '')),
+          relatedId: taskId,
+          senderName: await _userService.getDisplayName(user.email ?? ''),
+        );
+      }
+    }
+    return true;
+  }
+
+  /// Native: copies the photos into a persisted session and registers the
+  /// background worker that uploads them, reports progress and applies the
+  /// final flip even if the app is killed mid-upload.
+  Future<bool> _startTaskUploadSession({
+    required String taskId,
+    required List<Uint8List> images,
+    required String previousStatus,
+    required bool approveDirectly,
+    required String? completionDescription,
+    required User user,
+    required AppTask? current,
+    void Function(int completed, int total)? onProgress,
+    void Function(int bytesSent, int totalBytes)? onByteProgress,
+  }) async {
+    final taskTitle = current?.title ?? '';
+    final createdBy = current?.createdBy ?? '';
+    final assignedToEmail = current?.assignedToEmail ?? '';
+    final senderName = await _userService.getDisplayName(user.email ?? '');
+    final sessionId = await UploadSessionService.createTaskSession(
+      taskId: taskId,
+      images: images,
+      previousStatus: previousStatus,
+      approveDirectly: approveDirectly,
+      completionDescription: completionDescription,
+      actorEmail: user.email ?? '',
+      senderName: senderName,
+      taskTitle: taskTitle,
+      createdBy: createdBy,
+      assignedToEmail: assignedToEmail,
+      pushType: approveDirectly ? 'task_approved' : 'task_submitted',
+      pushRecipientEmail: approveDirectly ? assignedToEmail : createdBy,
+      pushTitle:
+          approveDirectly ? _t('notify_task_approved') : _t('notify_task_submitted'),
+      pushMessage: approveDirectly
+          ? '"$taskTitle" ${_t('notif_task_approved_msg')}'
+          : '${_t('notif_task_submitted_msg')} "$taskTitle"'
+              .replaceAll('{name}', senderName),
+      pushSenderName: senderName,
+      historyAction: approveDirectly ? 'approved' : 'submitted_proof',
+      historyBy: user.displayName ?? user.email ?? 'unknown',
+    );
+    _sessionOnProgress[sessionId] = onProgress;
+    _sessionOnByteProgress[sessionId] = onByteProgress;
+    await Workmanager().registerOneOffTask(
+      'bg-upload-$sessionId',
+      uploadTaskName,
+      inputData: {'sessionId': sessionId},
+      constraints: Constraints(networkType: NetworkType.connected),
+      existingWorkPolicy: ExistingWorkPolicy.replace,
+    );
+    _startSessionPoller(sessionId);
+    return true;
   }
 
   Future<bool> approveTask(String taskId, String approvedBy) async {
@@ -698,6 +802,95 @@ class TaskProvider extends ChangeNotifier {
         'uploadsComplete': true,
       });
     } catch (_) {}
+    // Native: also kill the background worker so it does not keep uploading
+    // and does not apply the final flip.
+    if (!kIsWeb) {
+      unawaited(() async {
+        final session = await UploadSessionService.findByTaskId(taskId);
+        if (session != null) {
+          await UploadSessionService.markCancelled(session.sessionId);
+          await Workmanager().cancelByUniqueName(session.uniqueName);
+          _stopSessionPoller(session.sessionId);
+          _sessionOnProgress.remove(session.sessionId);
+          _sessionOnByteProgress.remove(session.sessionId);
+        }
+      }());
+    }
+  }
+
+  /// Polls a background upload session's state file so in-app progress bars
+  /// track the worker without a second upload. Fires the callbacks only when
+  /// the numbers actually change. Stops when the session leaves 'uploading'.
+  void _startSessionPoller(String sessionId) {
+    _stopSessionPoller(sessionId);
+    _sessionPollers[sessionId] = Timer.periodic(
+      const Duration(milliseconds: 600),
+      (_) async {
+        final session = await UploadSessionService.read(sessionId);
+        if (session == null) {
+          _stopSessionPoller(sessionId);
+          return;
+        }
+        final lastProgress = _sessionLastProgress[sessionId];
+        final done = session.completedPhotos;
+        if (done != lastProgress) {
+          _sessionLastProgress[sessionId] = done;
+          _sessionOnProgress[sessionId]?.call(done, session.photos.length);
+        }
+        final lastBytes = _sessionLastBytes[sessionId];
+        if (session.bytesSent != lastBytes) {
+          _sessionLastBytes[sessionId] = session.bytesSent;
+          _sessionOnByteProgress[sessionId]
+              ?.call(session.bytesSent, session.totalBytes);
+        }
+        if (session.status != 'uploading') {
+          _stopSessionPoller(sessionId);
+          _sessionOnProgress.remove(sessionId);
+          _sessionOnByteProgress.remove(sessionId);
+          if (session.finalApplied) {
+            UploadSessionService.delete(sessionId);
+          }
+        }
+      },
+    );
+  }
+
+  void _stopSessionPoller(String sessionId) {
+    _sessionPollers.remove(sessionId)?.cancel();
+    _sessionLastProgress.remove(sessionId);
+    _sessionLastBytes.remove(sessionId);
+  }
+
+  /// Startup sweep for leftover background sessions from a previous run:
+  /// - finished-but-not-applied sessions get their final flip done here
+  ///   (the worker may have been killed between upload and flip)
+  /// - cancelled/finished sessions are cleaned up
+  /// - interrupted ones are re-enqueued to the worker
+  Future<void> reconcilePendingUploads() async {
+    if (kIsWeb) return;
+    final sessions = await UploadSessionService.readAll();
+    for (final session in sessions) {
+      if (session.status == 'cancelled' || session.finalApplied) {
+        await UploadSessionService.delete(session.sessionId);
+        continue;
+      }
+      if (session.pendingApply && session.status == 'done') {
+        final ok = await UploadFinalizer.apply(session);
+        if (ok) await UploadSessionService.delete(session.sessionId);
+        continue;
+      }
+      if (session.status == 'uploading' || session.status == 'failed') {
+        try {
+          await Workmanager().registerOneOffTask(
+            session.uniqueName,
+            uploadTaskName,
+            inputData: {'sessionId': session.sessionId},
+            constraints: Constraints(networkType: NetworkType.connected),
+            existingWorkPolicy: ExistingWorkPolicy.keep,
+          );
+        } catch (_) {}
+      }
+    }
   }
 
   Future<bool> withdrawTaskSubmission(String taskId) async {
@@ -907,27 +1100,56 @@ class TaskProvider extends ChangeNotifier {
       });
       final docId = problemId;
       if (photos.isNotEmpty) {
-        final urls = await _storage.uploadImages(
-          photos,
-          'problem_photos/${reportedBy}_${DateTime.now().millisecondsSinceEpoch}',
-          onProgress: (done, total, urlsSoFar) {
-            onProgress?.call(done, total);
-            unawaited(_firestore
-                .updateProblem(docId, {
-                  'photoUrls': urlsSoFar,
-                  'uploadCompleted': done,
-                  'uploadTotal': total,
-                })
-                .catchError((_) {}));
-          },
-          onByteProgress: onByteProgress,
-        );
-        await _firestore.updateProblem(problemId, {
-          'photoUrl': urls.isEmpty ? null : urls.first,
-          'photoUrls': urls,
-          'uploadCompleted': urls.length,
-          'uploadTotal': photos.length,
-        });
+        if (kIsWeb) {
+          // Web: upload in-process (no background workers available).
+          final urls = await _storage.uploadImages(
+            photos,
+            'problem_photos/${reportedBy}_${DateTime.now().millisecondsSinceEpoch}',
+            onProgress: (done, total, urlsSoFar) {
+              onProgress?.call(done, total);
+              unawaited(_firestore
+                  .updateProblem(docId, {
+                    'photoUrls': urlsSoFar,
+                    'uploadCompleted': done,
+                    'uploadTotal': total,
+                  })
+                  .catchError((_) {}));
+            },
+            onByteProgress: onByteProgress,
+          );
+          await _firestore.updateProblem(problemId, {
+            'photoUrl': urls.isEmpty ? null : urls.first,
+            'photoUrls': urls,
+            'uploadCompleted': urls.length,
+            'uploadTotal': photos.length,
+          });
+        } else {
+          // Native: hand the photos to the background worker — the upload
+          // survives the app being backgrounded or killed.
+          final sessionId = await UploadSessionService.createProblemSession(
+            problemId: problemId,
+            images: photos,
+            reportedBy: reportedBy,
+            reporterName: reporterName,
+            description: description,
+            carOrThing: carOrThing,
+            managerEmail: managerEmail,
+            pushTitle: _t('notify_problem_reported'),
+            pushMessage:
+                _t('notif_problem_reported_msg').replaceAll('{name}', reporterName),
+          );
+          _sessionOnProgress[sessionId] = onProgress;
+          _sessionOnByteProgress[sessionId] = onByteProgress;
+          await Workmanager().registerOneOffTask(
+            'bg-upload-$sessionId',
+            uploadTaskName,
+            inputData: {'sessionId': sessionId},
+            constraints: Constraints(networkType: NetworkType.connected),
+            existingWorkPolicy: ExistingWorkPolicy.replace,
+          );
+          _startSessionPoller(sessionId);
+          return true;
+        }
       }
       // Publish: the report is fully uploaded, so it becomes 'open'.
       await _firestore.updateProblem(problemId, {

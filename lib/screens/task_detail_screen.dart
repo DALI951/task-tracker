@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
@@ -13,6 +14,7 @@ import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 import 'package:task_tracker/utils/device_utils.dart';
+import 'package:task_tracker/widgets/photo_viewer.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final AppTask task;
@@ -34,7 +36,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   int _uploadTotal = 0;
   int _bytesSent = 0;
   int _totalBytes = 0;
-  final List<Uint8List> _proofPhotos = [];
+  final List<XFile> _proofPhotos = [];
   late final TextEditingController _completionDescCtrl;
 
   @override
@@ -69,13 +71,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (picked.isEmpty) return;
     final room = 50 - _proofPhotos.length;
     if (room <= 0) return;
-    final bytesList = <Uint8List>[];
-    for (final file in picked.take(room)) {
-      bytesList.add(await file.readAsBytes());
-    }
-    if (mounted && bytesList.isNotEmpty) {
-      setState(() => _proofPhotos.addAll(bytesList));
-    }
+    setState(() => _proofPhotos.addAll(picked.take(room)));
   }
 
   Future<void> _submitProof() async {
@@ -83,18 +79,21 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       toast(context, 'Add a photo or enter a description', error: true);
       return;
     }
+    final images = <Uint8List>[];
+    for (final file in _proofPhotos) {
+      images.add(await file.readAsBytes());
+    }
     setState(() {
       _uploading = true;
       _uploadCompleted = 0;
       _uploadTotal = _proofPhotos.length;
       _bytesSent = 0;
-      _totalBytes =
-          _proofPhotos.fold<int>(0, (sum, b) => sum + b.length);
+      _totalBytes = images.fold<int>(0, (sum, b) => sum + b.length);
     });
     try {
       final ok = await context.read<TaskProvider>().completeTaskWithProof(
         taskId: widget.task.id,
-        images: _proofPhotos,
+        images: images,
         completionDescription: _completionDescCtrl.text.trim().isEmpty ? null : _completionDescCtrl.text.trim(),
         // Managers complete the task outright (no review step).
         approveDirectly: widget.isManager,
@@ -247,48 +246,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
   }
 
-  void _showPhotoGallery() {
-    if (widget.task.photoUrl == null) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            Center(
-              child: InteractiveViewer(
-                child: StorageService.isRemotePhoto(widget.task.photoUrl!)
-                    ? Image.network(
-                        widget.task.photoUrl!,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.broken_image,
-                                color: Colors.white54, size: 64)),
-                      )
-                    : Image.memory(
-                        base64Decode(widget.task.photoUrl!),
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.broken_image,
-                                color: Colors.white54, size: 64)),
-                      ),
-              ),
-            ),
-            PositionedDirectional(
-              top: 40,
-              end: 16,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.pop(ctx),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _showReassignDialog() async {
     final employees = context.read<TaskProvider>().employees;
     if (employees.isEmpty) {
@@ -429,7 +386,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(
+            16, 16, 16, MediaQuery.paddingOf(context).bottom + 32),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,7 +484,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                Wrap(
                  spacing: 8,
                  runSpacing: 8,
-                 children: task.photoUrls.asMap().entries.map((entry) => Stack(
+                 children: task.photoUrls.asMap().entries.map((entry) => GestureDetector(
+                   onTap: () => PhotoViewer.show(context,
+                       photos: task.photoUrls, initialIndex: entry.key),
+                   child: Stack(
                    children: [
                      ClipRRect(
                    borderRadius: BorderRadius.circular(Brand.radiusMd),
@@ -554,12 +515,25 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                      ),
                      PositionedDirectional(top: 4, start: 4, child: CircleAvatar(radius: 12, child: Text('${entry.key + 1}'))),
                    ],
-                 )).toList(),
+                 ))).toList(),
                ),
-               if (task.completionDescription != null) Padding(
-                 padding: const EdgeInsets.only(top: 8),
-                 child: Text(task.completionDescription!, style: TextStyle(color: cs.onSurfaceVariant)),
-               ),
+            ],
+            if (task.completionDescription != null) ...[
+              const SizedBox(height: 20),
+              Text(t('description'),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600, color: cs.onSurface)),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest.withAlpha(60),
+                  borderRadius: BorderRadius.circular(Brand.radiusMd),
+                ),
+                child: Text(task.completionDescription!,
+                    style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant)),
+              ),
             ],
             if (task.history.isNotEmpty) ...[
               const SizedBox(height: 20),
@@ -816,10 +790,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         _proofPhotos.insert(newIndex, photo);
       }),
       itemBuilder: (_, i) => Padding(
-        key: ValueKey(_proofPhotos[i]),
+        key: ValueKey(_proofPhotos[i].path),
         padding: const EdgeInsetsDirectional.only(end: 8),
         child: Stack(children: [
-          Image.memory(_proofPhotos[i], width: 84, height: 84, fit: BoxFit.cover, cacheWidth: 168),
+          LazyPhotoThumb(file: _proofPhotos[i], size: 84),
           PositionedDirectional(top: 0, end: 0, child: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => setState(() => _proofPhotos.removeAt(i)))),
           PositionedDirectional(bottom: 2, start: 2, child: CircleAvatar(radius: 10, child: Text('${i + 1}', style: const TextStyle(fontSize: 11)))),
         ]),

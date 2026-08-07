@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:task_tracker/config/brand.dart';
@@ -7,9 +9,11 @@ import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
+import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/device_utils.dart';
 import 'package:task_tracker/utils/error_handler.dart';
+import 'package:task_tracker/widgets/photo_viewer.dart';
 
 class ReportProblemScreen extends StatefulWidget {
   const ReportProblemScreen({super.key});
@@ -20,7 +24,7 @@ class ReportProblemScreen extends StatefulWidget {
 
 class _ReportProblemScreenState extends State<ReportProblemScreen> {
   final _descCtrl = TextEditingController();
-  final List<Uint8List> _photos = [];
+  final List<XFile> _photos = [];
   String? _selectedCarOrThing;
   bool _sending = false;
   int _uploadCompleted = 0;
@@ -39,23 +43,21 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     if (picked.isEmpty) return;
     final room = 50 - _photos.length;
     if (room <= 0) return;
-    final bytesList = <Uint8List>[];
-    for (final file in picked.take(room)) {
-      bytesList.add(await file.readAsBytes());
-    }
-    if (mounted && bytesList.isNotEmpty) {
-      setState(() => _photos.addAll(bytesList));
-    }
+    setState(() => _photos.addAll(picked.take(room)));
   }
 
   Future<void> _send() async {
     if (_descCtrl.text.trim().isEmpty) return;
+    final images = <Uint8List>[];
+    for (final file in _photos) {
+      images.add(await file.readAsBytes());
+    }
     setState(() {
       _sending = true;
       _uploadCompleted = 0;
-      _uploadTotal = _photos.length;
+      _uploadTotal = images.length;
       _bytesSent = 0;
-      _totalBytes = _photos.fold<int>(0, (sum, b) => sum + b.length);
+      _totalBytes = images.fold<int>(0, (sum, b) => sum + b.length);
     });
     try {
       final user = AuthService().currentUser;
@@ -65,7 +67,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             reportedBy: user.email ?? '',
             reporterName: name,
             description: _descCtrl.text.trim(),
-            photos: _photos,
+            photos: images,
             carOrThing: _selectedCarOrThing,
             onProgress: (done, total) {
               if (mounted) setState(() {
@@ -155,9 +157,10 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 scrollDirection: Axis.horizontal,
                 itemCount: _photos.length,
                 itemBuilder: (_, i) => Padding(
+                  key: ValueKey(_photos[i].path),
                   padding: const EdgeInsetsDirectional.only(end: 8),
                   child: Stack(children: [
-                    Image.memory(_photos[i], width: 100, height: 100, fit: BoxFit.cover, cacheWidth: 200),
+                    LazyPhotoThumb(file: _photos[i], size: 100),
                     PositionedDirectional(top: 0, end: 0, child: IconButton(
                       icon: const Icon(Icons.close, color: Colors.white),
                       onPressed: () => setState(() => _photos.removeAt(i)),
@@ -271,49 +274,149 @@ class _ReportStatusCard extends StatelessWidget {
     }
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    problem.description,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, color: cs.onSurface),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showDetails(context),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      problem.description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 14, color: cs.onSurface),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(icon, size: 18, color: fg),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                        fontSize: 12, color: fg, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                dateFormat.format(problem.createdAt),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+              if (uploading) ...[
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: problem.uploadProgress,
+                    minHeight: 5,
+                    backgroundColor: cs.surfaceContainerHighest,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(icon, size: 18, color: fg),
-                const SizedBox(width: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                      fontSize: 12, color: fg, fontWeight: FontWeight.w600),
+              ],
+              if (problem.photoUrls.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 60,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: problem.photoUrls.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) {
+                      final photo = problem.photoUrls[i];
+                      return GestureDetector(
+                        onTap: () => PhotoViewer.show(context,
+                            photos: problem.photoUrls, initialIndex: i),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(Brand.radiusSm),
+                          child: StorageService.isRemotePhoto(photo)
+                              ? Image.network(photo,
+                                  width: 60, height: 60, fit: BoxFit.cover)
+                              : Image.memory(base64Decode(photo),
+                                  width: 60, height: 60, fit: BoxFit.cover),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              dateFormat.format(problem.createdAt),
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-            ),
-            if (uploading) ...[
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: problem.uploadProgress,
-                  minHeight: 5,
-                  backgroundColor: cs.surfaceContainerHighest,
-                ),
-              ),
             ],
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDetails(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      problem.description,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                dateFormat.format(problem.createdAt),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+              if (problem.carOrThing != null) ...[
+                const SizedBox(height: 8),
+                Text('${context.read<SettingsService>().t('car_thing')}: ${problem.carOrThing}',
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+              ],
+              if (problem.photoUrls.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: problem.photoUrls.asMap().entries.map((entry) {
+                    final photo = entry.value;
+                    return GestureDetector(
+                      onTap: () => PhotoViewer.show(context,
+                          photos: problem.photoUrls, initialIndex: entry.key),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(Brand.radiusSm),
+                        child: StorageService.isRemotePhoto(photo)
+                            ? Image.network(photo,
+                                width: 120, height: 120, fit: BoxFit.cover)
+                            : Image.memory(base64Decode(photo),
+                                width: 120, height: 120, fit: BoxFit.cover),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );

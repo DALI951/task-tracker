@@ -8,10 +8,12 @@ import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/firebase_options.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_gate.dart';
+import 'package:task_tracker/services/background_worker.dart';
 import 'package:task_tracker/services/push_notification_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
 import 'package:task_tracker/services/update_download_manager.dart';
 import 'package:task_tracker/services/update_service.dart';
+import 'package:workmanager/workmanager.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> scaffoldKey =
@@ -26,6 +28,9 @@ void main() {
 Future<void> _initApp() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (!kIsWeb) {
+    // Registers the callbackDispatcher for the background upload/download
+    // workers (must happen before any registerOneOffTask call).
+    await Workmanager().initialize(callbackDispatcher);
     runApp(TaskTrackerApp());
     // Init push notifications after app is running (non-blocking)
     PushNotificationService().initialize();
@@ -93,6 +98,10 @@ class TaskTrackerApp extends StatelessWidget {
             });
             final settings = context.read<SettingsService>();
             context.read<TaskProvider>().attachSettings(settings);
+            // Pick up work that finished while the app was closed (uploads
+            // needing their final write, a finished update download).
+            context.read<UpdateDownloadManager>().restoreState();
+            context.read<TaskProvider>().reconcilePendingUploads();
           });
           return const _AppWithSettings();
         },
