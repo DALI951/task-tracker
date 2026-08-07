@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,7 +8,6 @@ import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
-import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/device_utils.dart';
 import 'package:task_tracker/utils/error_handler.dart';
@@ -27,6 +25,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   final List<XFile> _photos = [];
   String? _selectedCarOrThing;
   bool _sending = false;
+  bool _preparing = false;
   int _uploadCompleted = 0;
   int _uploadTotal = 0;
   int _bytesSent = 0;
@@ -48,15 +47,24 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
   Future<void> _send() async {
     if (_descCtrl.text.trim().isEmpty) return;
+    // Show feedback immediately: reading/decoding the picked photos into
+    // memory can take a moment with many photos, then upload progress runs.
+    setState(() {
+      _sending = true;
+      _preparing = true;
+      _uploadCompleted = 0;
+      _uploadTotal = _photos.length;
+      _bytesSent = 0;
+      _totalBytes = 0;
+    });
     final images = <Uint8List>[];
     for (final file in _photos) {
       images.add(await file.readAsBytes());
     }
+    if (!mounted) return;
     setState(() {
-      _sending = true;
-      _uploadCompleted = 0;
+      _preparing = false;
       _uploadTotal = images.length;
-      _bytesSent = 0;
       _totalBytes = images.fold<int>(0, (sum, b) => sum + b.length);
     });
     try {
@@ -181,14 +189,16 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(children: [
                 Expanded(child: LinearProgressIndicator(
-                  value: _totalBytes == 0
+                  value: _preparing || _totalBytes == 0
                       ? null
                       : (_bytesSent / _totalBytes).clamp(0.0, 1.0),
                 )),
                 const SizedBox(width: 8),
                 Text(
-                  'Photo $_uploadCompleted/$_uploadTotal'
-                  '${_totalBytes == 0 ? '' : ' · ${((_bytesSent / _totalBytes) * 100).round()}%'}',
+                  _preparing
+                      ? 'Preparing photos…'
+                      : 'Photo $_uploadCompleted/$_uploadTotal'
+                          '${_totalBytes == 0 ? '' : ' · ${((_bytesSent / _totalBytes) * 100).round()}%'}',
                 ),
               ]),
             ),
@@ -332,14 +342,7 @@ class _ReportStatusCard extends StatelessWidget {
                       return GestureDetector(
                         onTap: () => PhotoViewer.show(context,
                             photos: problem.photoUrls, initialIndex: i),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(Brand.radiusSm),
-                          child: StorageService.isRemotePhoto(photo)
-                              ? Image.network(photo,
-                                  width: 60, height: 60, fit: BoxFit.cover)
-                              : Image.memory(base64Decode(photo),
-                                  width: 60, height: 60, fit: BoxFit.cover),
-                        ),
+                        child: RemotePhoto(url: photo, width: 60, height: 60),
                       );
                     },
                   ),
@@ -398,17 +401,15 @@ class _ReportStatusCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: problem.photoUrls.asMap().entries.map((entry) {
-                    final photo = entry.value;
                     return GestureDetector(
                       onTap: () => PhotoViewer.show(context,
                           photos: problem.photoUrls, initialIndex: entry.key),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(Brand.radiusSm),
-                        child: StorageService.isRemotePhoto(photo)
-                            ? Image.network(photo,
-                                width: 120, height: 120, fit: BoxFit.cover)
-                            : Image.memory(base64Decode(photo),
-                                width: 120, height: 120, fit: BoxFit.cover),
+                      child: RemotePhoto(
+                        url: entry.value,
+                        width: 120,
+                        height: 120,
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(Brand.radiusSm)),
                       ),
                     );
                   }).toList(),

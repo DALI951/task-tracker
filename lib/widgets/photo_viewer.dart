@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:task_tracker/config/brand.dart';
@@ -106,15 +107,14 @@ class _PhotoViewerScreenState extends State<_PhotoViewerScreen> {
       child: Icon(Icons.broken_image, color: Colors.white54, size: 64),
     );
     if (StorageService.isRemotePhoto(photo)) {
-      return Image.network(
-        photo,
+      return CachedNetworkImage(
+        imageUrl: photo,
         fit: BoxFit.contain,
-        loadingBuilder: (_, child, progress) => progress == null
-            ? child
-            : const Center(
-                child: CircularProgressIndicator(color: Colors.white54),
-              ),
-        errorBuilder: (_, __, ___) => broken,
+        placeholder: (_, __) => const Center(
+          child: CircularProgressIndicator(color: Colors.white54),
+        ),
+        errorWidget: (_, __, ___) => broken,
+        fadeInDuration: const Duration(milliseconds: 120),
       );
     }
     try {
@@ -184,6 +184,67 @@ class _LazyPhotoThumbState extends State<LazyPhotoThumb> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Remote thumbnail with an instant spinner placeholder, a broken-image
+/// fallback and disk + memory caching (via `cached_network_image`), so
+/// re-viewing a photo never waits on the network again. Fixed-size by design
+/// (like [LazyPhotoThumb]); for full-screen viewing use [PhotoViewer].
+class RemotePhoto extends StatelessWidget {
+  final String url;
+  final double width;
+  final double height;
+  final BoxFit fit;
+  final BorderRadius borderRadius;
+
+  const RemotePhoto({
+    super.key,
+    required this.url,
+    required this.width,
+    required this.height,
+    this.fit = BoxFit.cover,
+    this.borderRadius = const BorderRadius.all(Radius.circular(Brand.radiusSm)),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final placeholder = Container(
+      width: width,
+      height: height,
+      color: cs.surfaceContainerHighest,
+      child: Center(
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: cs.outline,
+          ),
+        ),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: CachedNetworkImage(
+        imageUrl: url,
+        width: width,
+        height: height,
+        fit: fit,
+        memCacheWidth: (width * 2).round(),
+        maxWidthDiskCache: 2048,
+        placeholder: (_, __) => placeholder,
+        errorWidget: (_, __, ___) => Container(
+          width: width,
+          height: height,
+          color: cs.surfaceContainerHighest,
+          child: Icon(Icons.broken_image, size: 24, color: cs.outline),
+        ),
+        fadeInDuration: const Duration(milliseconds: 120),
+        fadeOutDuration: const Duration(milliseconds: 60),
       ),
     );
   }

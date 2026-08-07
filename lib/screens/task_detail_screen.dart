@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,7 +9,6 @@ import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/screens/manage_employees_screen.dart';
 import 'package:task_tracker/services/auth_service.dart';
 import 'package:task_tracker/services/settings_service.dart';
-import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/services/user_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 import 'package:task_tracker/utils/device_utils.dart';
@@ -484,34 +482,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                Wrap(
                  spacing: 8,
                  runSpacing: 8,
-                 children: task.photoUrls.asMap().entries.map((entry) => GestureDetector(
+                   children: task.photoUrls.asMap().entries.map((entry) => GestureDetector(
                    onTap: () => PhotoViewer.show(context,
                        photos: task.photoUrls, initialIndex: entry.key),
                    child: Stack(
                    children: [
-                     ClipRRect(
-                   borderRadius: BorderRadius.circular(Brand.radiusMd),
-                   child: StorageService.isRemotePhoto(entry.value)
-                       ? Image.network(entry.value, width: 150, height: 150,
-                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            height: 200,
-                            color: cs.surfaceContainerHighest,
-                            child: Center(
-                                child: Icon(Icons.broken_image,
-                                    size: 48, color: cs.outline)),
-                          ),
-                        )
-                       : Image.memory(base64Decode(entry.value), width: 150, height: 150,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            height: 200,
-                            color: cs.surfaceContainerHighest,
-                            child: Center(
-                                child: Icon(Icons.broken_image,
-                                    size: 48, color: cs.outline)),
-                          ),
-                        ),
+                     RemotePhoto(
+                       url: entry.value,
+                       width: 150,
+                       height: 150,
+                       borderRadius: const BorderRadius.all(Radius.circular(Brand.radiusMd)),
                      ),
                      PositionedDirectional(top: 4, start: 4, child: CircleAvatar(radius: 12, child: Text('${entry.key + 1}'))),
                    ],

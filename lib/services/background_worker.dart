@@ -206,6 +206,14 @@ Future<void> _showUploadProgress(
   final pct = session.totalBytes > 0
       ? (sentBytes / session.totalBytes).clamp(0.0, 1.0)
       : null;
+  // Identify WHICH upload this is: with several tasks + problem reports
+  // uploading at once each session gets its own notification, and the title
+  // says what is being uploaded.
+  final isTask = session.type == 'task_completion';
+  final title = isTask ? 'Uploading task…' : 'Uploading report…';
+  final what = isTask ? session.taskTitle : '${session.reporterName}: ${session.description}';
+  final body = '${_shorten(what, 42)}\nPhoto $done/${session.photos.length}'
+      '${pct == null ? '' : ' · ${(pct * 100).round()}%'}';
   final details = AndroidNotificationDetails(
     _channelId,
     _channelName,
@@ -219,17 +227,20 @@ Future<void> _showUploadProgress(
   );
   await _notifications().show(
     notifId,
-    'Uploading photos…',
-    'Photo $done/${session.photos.length}'
-        '${pct == null ? '' : ' · ${(pct * 100).round()}%'}',
+    title,
+    body,
     NotificationDetails(android: details),
     payload: json.encode({
-      'type': session.type == 'task_completion'
-          ? 'task_upload'
-          : 'problem_upload',
+      'type': isTask ? 'task_upload' : 'problem_upload',
       'relatedId': session.docId,
     }),
   );
+}
+
+String _shorten(String? s, int max) {
+  final trimmed = (s ?? '').trim();
+  if (trimmed.length <= max) return trimmed;
+  return '${trimmed.substring(0, max - 1)}…';
 }
 
 /// Transforms the progress notification in place into a completion one.
@@ -240,7 +251,9 @@ Future<void> _showCompletionNotification(
       ? session.approveDirectly
           ? ('Task completed', '“${session.taskTitle}” approved', 'task_approved')
           : ('Task submitted', '“${session.taskTitle}” sent for review', 'task_submitted')
-      : ('Problem reported', 'Your problem report was sent to the manager', 'problem_reported');
+      : ('Problem reported',
+          '“${_shorten(session.description, 42)}” was sent to the manager',
+          'problem_reported');
   final details = AndroidNotificationDetails(
     _channelId,
     _channelName,

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -6,7 +5,6 @@ import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/problem.dart';
 import 'package:task_tracker/providers/task_provider.dart';
 import 'package:task_tracker/services/settings_service.dart';
-import 'package:task_tracker/services/storage_service.dart';
 import 'package:task_tracker/utils/error_handler.dart';
 import 'package:task_tracker/widgets/photo_viewer.dart';
 
@@ -47,7 +45,6 @@ class _ProblemsScreenState extends State<ProblemsScreen> {
                        DropdownMenuItem(value: 'open', child: Text(t('filter_open'))),
                        DropdownMenuItem(value: 'uploading', child: const Text('Uploading')),
                        DropdownMenuItem(value: 'assigned', child: Text(t('filter_assigned'))),
-                       DropdownMenuItem(value: 'resolved', child: Text(t('resolved'))),
                     ],
                      onChanged: (v) => setState(() => _filter = v ?? 'all'),
                   ),
@@ -217,23 +214,24 @@ class _ProblemCard extends StatelessWidget {
             ],
             if (problem.photoUrls.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: problem.photoUrls.asMap().entries.map((entry) {
-                  final photo = entry.value;
-                  final image = StorageService.isRemotePhoto(photo)
-                      ? Image.network(photo, width: 120, height: 120, fit: BoxFit.cover)
-                      : Image.memory(base64Decode(photo), width: 120, height: 120, fit: BoxFit.cover);
-                  return GestureDetector(
-                    onTap: () => PhotoViewer.show(context,
-                        photos: problem.photoUrls, initialIndex: entry.key),
-                    child: Stack(children: [
-                      ClipRRect(borderRadius: BorderRadius.circular(Brand.radiusSm), child: image),
-                      PositionedDirectional(top: 3, start: 3, child: CircleAvatar(radius: 11, child: Text('${entry.key + 1}'))),
-                    ]),
-                  );
-                }).toList(),
+              SizedBox(
+                height: 90,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: problem.photoUrls.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final photo = problem.photoUrls[i];
+                    return GestureDetector(
+                      onTap: () => PhotoViewer.show(context,
+                          photos: problem.photoUrls, initialIndex: i),
+                      child: Stack(children: [
+                        RemotePhoto(url: photo, width: 90, height: 90),
+                        PositionedDirectional(top: 3, start: 3, child: CircleAvatar(radius: 11, child: Text('${i + 1}'))),
+                      ]),
+                    );
+                  },
+                ),
               ),
             ],
             if (problem.isOpen)

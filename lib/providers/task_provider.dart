@@ -531,6 +531,11 @@ class TaskProvider extends ChangeNotifier {
       final current = _tasks.where((t) => t.id == taskId).firstOrNull;
       final previousStatus = current?.status ?? (approveDirectly ? 'pending' : 'doing');
       _uploadFromStatus[taskId] = previousStatus;
+      if (images.isEmpty && current != null) {
+        // Re-submitting after a withdraw: keep the photos that were already
+        // uploaded instead of wiping them in the final write.
+        photoUrls.addAll(current.photoUrls);
+      }
       if (images.isNotEmpty) {
         await _firestore.updateTask(taskId, {
           'status': 'uploading',
@@ -893,13 +898,13 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
+  /// Employee withdraws their submission: the task returns to 'doing' but the
+  /// uploaded photos + description stay on the document so they can re-submit
+  /// without re-picking everything (and can drop individual photos locally).
   Future<bool> withdrawTaskSubmission(String taskId) async {
     try {
       await _firestore.updateTask(taskId, {
         'status': 'doing',
-        'photoUrl': null,
-        'photoUrls': [],
-        'completionDescription': null,
         'completedAt': null,
         'uploadsComplete': true,
       });

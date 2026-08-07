@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:task_tracker/config/brand.dart';
 import 'package:task_tracker/models/task.dart';
 import 'package:task_tracker/services/storage_service.dart';
+import 'package:task_tracker/widgets/photo_viewer.dart';
 
 class TaskCard extends StatelessWidget {
   final AppTask task;
@@ -137,23 +138,11 @@ class TaskCard extends StatelessWidget {
               if (task.photoUrl != null)
                 Padding(
                   padding: const EdgeInsetsDirectional.only(start: 8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(Brand.radiusSm),
-                    child: StorageService.isRemotePhoto(task.photoUrl!)
-                        ? Image.network(
-                            task.photoUrl!,
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              width: 48,
-                              height: 48,
-                              color: cs.surfaceContainerHighest,
-                              child: Icon(Icons.broken_image,
-                                  size: 24, color: cs.outline),
-                            ),
-                          )
-                        : Image.memory(
+                  child: StorageService.isRemotePhoto(task.photoUrl!)
+                      ? RemotePhoto(url: task.photoUrl!, width: 48, height: 48)
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(Brand.radiusSm),
+                          child: Image.memory(
                             base64Decode(task.photoUrl!),
                             width: 48,
                             height: 48,
@@ -166,7 +155,7 @@ class TaskCard extends StatelessWidget {
                                   size: 24, color: cs.outline),
                             ),
                           ),
-                  ),
+                        ),
                 ),
             ],
           ),
