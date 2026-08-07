@@ -12,8 +12,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   build-apk:
@@ -64,60 +62,9 @@ jobs:
           name: apk
           path: releases/Task-Tracker-v${{ steps.version.outputs.version }}.apk
 
-  build-web:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Extract version
-        id: version
-        run: |
-          VERSION=$(grep 'version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build Web
-        run: flutter build web --release --base-href /task-tracker/
-
-      - name: Zip web build
-        run: |
-          mkdir -p releases
-          cd build/web
-          zip -r ../../releases/Task-Tracker-v${{ steps.version.outputs.version }}-web.zip .
-
-      - name: Upload web artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-zip
-          path: releases/Task-Tracker-v${{ steps.version.outputs.version }}-web.zip
-
-      - name: Upload web pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-
-  deploy-web:
-    needs: build-web
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
   create-release:
-    needs: [build-apk, build-web]
-    if: always() && (needs.build-apk.result == 'success' || needs.build-web.result == 'success')
+    needs: [build-apk]
+    if: always() && needs.build-apk.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -149,7 +96,6 @@ jobs:
             echo ""
             echo "### Install"
             echo "- Android: download and open the .apk (allow unknown sources)"
-            echo "- Web: download and unzip, or use https://dali951.github.io/task-tracker/"
             echo ""
             echo "### What's New"
             echo ""
