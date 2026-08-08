@@ -158,6 +158,29 @@ class _AuthGateState extends State<AuthGate> {
       }
     }
 
+    // Self-heal: the users/{uid} write can fail at creation (offline, rules
+    // not deployed yet). If the manager's directory still lists this
+    // employee, the account itself may write its own role doc (rules allow
+    // owner-only write) — no manager action needed.
+    if (role == null && email.isNotEmpty) {
+      try {
+        final dir = await FirebaseFirestore.instance
+            .collection('employees')
+            .doc(email)
+            .get()
+            .timeout(const Duration(seconds: 10));
+        if (dir.exists) {
+          await FirebaseFirestore.instance.collection('users').doc(uid).set({
+            'email': email,
+            'role': 'employee',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          await prefs.setString('role_$uid', 'employee');
+          role = 'employee';
+        }
+      } catch (_) {}
+    }
+
     // Interim "delete" is directory-doc based: a manager removing an employee
     // deletes employees/{email}. Employees whose directory entry is gone are
     // blocked from signing in. On read errors (e.g. rules not deployed yet)

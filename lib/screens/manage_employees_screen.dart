@@ -106,7 +106,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
 
                           setDState(() => creating = true);
 
-                          final email = _emailCtrl.text.trim();
+                          final email = _emailCtrl.text.trim().toLowerCase();
                           final name = _nameCtrl.text.trim();
                           final password = _passCtrl.text;
 
