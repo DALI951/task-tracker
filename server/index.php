@@ -42,8 +42,6 @@ $apiKey = TT_WEB_API_KEY;
   <div class="card">
     <button class="btn primary" id="btn-create">Create Account</button>
     <div id="create-form" class="hidden">
-      <label>Passphrase</label>
-      <input type="password" id="c-pass" autocomplete="off">
       <label>Manager name</label>
       <input type="text" id="c-name" autocomplete="off">
       <label>Email</label>
@@ -101,23 +99,22 @@ $apiKey = TT_WEB_API_KEY;
   }
 
   document.getElementById('btn-create-submit').addEventListener('click', function () {
-    var pass = document.getElementById('c-pass').value.trim();
     var name = document.getElementById('c-name').value.trim();
     var email = document.getElementById('c-email').value.trim();
     var pass2 = document.getElementById('c-pass2').value;
-    if (!pass || !name || !email || !pass2) { setMsg('c-msg', 'Fill all fields.', false); return; }
+    if (!name || !email || !pass2) { setMsg('c-msg', 'Fill all fields.', false); return; }
     if (pass2.length < 6) { setMsg('c-msg', 'Password must be at least 6 characters.', false); return; }
     setMsg('c-msg', 'Creating account...', true);
     fetch('api/create-manager.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passphrase: pass, name: name, email: email, password: pass2 })
+      body: JSON.stringify({ name: name, email: email, password: pass2 })
     })
     .then(function (r) { return r.json().then(function (j) { return { status: r.status, j: j }; }); })
     .then(function (res) {
       if (res.j.ok) {
         setMsg('c-msg', 'Account created. The manager can now sign in with this email.', true);
-        ['c-pass','c-name','c-email','c-pass2'].forEach(function (i) { document.getElementById(i).value = ''; });
+        ['c-name','c-email','c-pass2'].forEach(function (i) { document.getElementById(i).value = ''; });
       } else {
         setMsg('c-msg', res.j.error || 'Something went wrong.', false);
       }

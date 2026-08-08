@@ -7,10 +7,6 @@ const TT_FIRESTORE_API = 'https://firestore.googleapis.com/v1/projects/task-trac
 
 const TT_SECRETS_DIR = __DIR__ . '/../secrets';
 
-function tt_passphrase(): string {
-    return require TT_SECRETS_DIR . '/passphrase.php';
-}
-
 function tt_service_account(): array {
     $json = @file_get_contents(TT_SECRETS_DIR . '/service-account.json');
     $data = $json ? json_decode($json, true) : null;
