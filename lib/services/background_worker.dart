@@ -118,6 +118,9 @@ Future<bool> _runUploadTask(String sessionId) async {
   var doneBytes = session.bytesSent;
   var lastByteNotify = DateTime.now().millisecondsSinceEpoch;
   await _showUploadProgress(notifId, session, done, doneBytes, force: true);
+  // Give the app the byte denominators immediately, so its bars show live
+  // overall progress from the very first chunk instead of photo-count jumps.
+  unawaited(_updateDocProgress(session, done, bytesSent: doneBytes));
 
   final sessionDir = await UploadSessionService.dir(sessionId);
   try {
@@ -140,12 +143,13 @@ Future<bool> _runUploadTask(String sessionId) async {
       }
       final bytes = File(path).readAsBytesSync();
 
-      // Keep the state file fresh so the app can tell a dead worker from a
-      // slow one (stale lastActivity -> auto-pause). Throttled: 15 s, and
-      // re-read before writing so a user Pause is never clobbered.
-      var lastActivityWrite = DateTime.now().millisecondsSinceEpoch;
+      // Throttled (1 s) live progress: state file (bytesSent + heartbeat) and
+      // the document counters, so the notification, the submitting screen and
+      // every card show the SAME overall byte-based percentage moving in real
+      // time. Re-read before writing so a user Pause is never clobbered.
+      var lastProgressWrite = DateTime.now().millisecondsSinceEpoch;
       await UploadSessionService.write(
-          latest.copyWith(lastActivity: lastActivityWrite));
+          latest.copyWith(bytesSent: doneBytes, lastActivity: lastProgressWrite));
 
       final url = await StorageService().uploadImageChunked(
         bytes,
@@ -153,19 +157,20 @@ Future<bool> _runUploadTask(String sessionId) async {
         onChunkProgress: (received, total) {
           doneBytes = session.bytesSent + received;
           final now = DateTime.now().millisecondsSinceEpoch;
-          if (now - lastActivityWrite > 15000) {
-            lastActivityWrite = now;
+          if (now - lastProgressWrite > 1000) {
+            lastProgressWrite = now;
             unawaited(() async {
               final fresh = await UploadSessionService.read(sessionId);
               if (fresh != null &&
                   fresh.status == 'uploading' &&
                   !fresh.finalApplied) {
                 await UploadSessionService.write(
-                    fresh.copyWith(lastActivity: now));
+                    fresh.copyWith(bytesSent: doneBytes, lastActivity: now));
+                await _updateDocProgress(fresh, done, bytesSent: doneBytes);
               }
             }());
           }
-          if (now - lastByteNotify > 700) {
+          if (now - lastByteNotify > 1000) {
             lastByteNotify = now;
             unawaited(_showUploadProgress(
                 notifId, session, done, doneBytes));
@@ -187,7 +192,7 @@ Future<bool> _runUploadTask(String sessionId) async {
       ], lastActivity: DateTime.now().millisecondsSinceEpoch);
       await UploadSessionService.write(updated);
 
-      unawaited(_updateDocProgress(updated, done));
+      unawaited(_updateDocProgress(updated, done, bytesSent: doneBytes));
       await _showUploadProgress(notifId, updated, done, doneBytes, force: true);
     }
   } catch (e) {
@@ -254,27 +259,31 @@ Future<bool> _markPaused(String sessionId) async {
   return retries <= maxUploadRetries;
 }
 
-/// Keeps the task/problem document's per-photo counters in sync while the
-/// worker uploads (both roles see live progress without opening the app).
-Future<void> _updateDocProgress(UploadSession session, int done) async {
+/// Keeps the task/problem document's per-photo AND byte-level counters in
+/// sync while the worker uploads (both roles see live progress without
+/// opening the app). Byte counters are the same numbers the progress
+/// notification uses, so every percentage agrees.
+Future<void> _updateDocProgress(UploadSession session, int done,
+    {int? bytesSent}) async {
   try {
     final urls = session.photos
         .map((p) => p.url)
         .where((u) => u.isNotEmpty)
         .toList();
+    final data = <String, dynamic>{
+      'photoUrls': urls,
+      'uploadCompleted': done,
+      'uploadTotal': session.photos.length,
+      if (bytesSent != null) ...{
+        'uploadBytesSent': bytesSent,
+        'uploadBytesTotal': session.totalBytes,
+      },
+    };
     final db = FirebaseFirestore.instance;
     if (session.type == 'task_completion') {
-      await db.collection('tasks').doc(session.docId).update({
-        'photoUrls': urls,
-        'uploadCompleted': done,
-        'uploadTotal': session.photos.length,
-      });
+      await db.collection('tasks').doc(session.docId).update(data);
     } else {
-      await db.collection('problems').doc(session.docId).update({
-        'photoUrls': urls,
-        'uploadCompleted': done,
-        'uploadTotal': session.photos.length,
-      });
+      await db.collection('problems').doc(session.docId).update(data);
     }
   } catch (_) {}
 }

@@ -13,6 +13,8 @@ class Problem {
   final bool uploadsComplete;
   final int uploadCompleted;
   final int uploadTotal;
+  final int uploadBytesSent;
+  final int uploadBytesTotal;
 
   Problem({
     required this.id,
@@ -29,6 +31,8 @@ class Problem {
     this.uploadsComplete = true,
     this.uploadCompleted = 0,
     this.uploadTotal = 0,
+    this.uploadBytesSent = 0,
+    this.uploadBytesTotal = 0,
   });
 
   bool get isOpen => status == 'open';
@@ -37,8 +41,13 @@ class Problem {
   bool get isUploading => status == 'uploading';
 
   /// 0..1 upload progress; null when no upload is in flight.
+  /// Byte-based when the worker reported live byte counts (same numbers as
+  /// the progress notification), photo-count as fallback.
   double? get uploadProgress {
     if (!isUploading || uploadTotal <= 0) return null;
+    if (uploadBytesTotal > 0) {
+      return (uploadBytesSent / uploadBytesTotal).clamp(0.0, 1.0);
+    }
     return (uploadCompleted / uploadTotal).clamp(0.0, 1.0);
   }
 
@@ -59,6 +68,8 @@ class Problem {
       uploadsComplete: map['uploadsComplete'] as bool? ?? true,
       uploadCompleted: map['uploadCompleted'] as int? ?? 0,
       uploadTotal: map['uploadTotal'] as int? ?? 0,
+      uploadBytesSent: map['uploadBytesSent'] as int? ?? 0,
+      uploadBytesTotal: map['uploadBytesTotal'] as int? ?? 0,
     );
   }
 
@@ -77,6 +88,8 @@ class Problem {
       'uploadsComplete': uploadsComplete,
       'uploadCompleted': uploadCompleted,
       'uploadTotal': uploadTotal,
+      'uploadBytesSent': uploadBytesSent,
+      'uploadBytesTotal': uploadBytesTotal,
     };
   }
 }

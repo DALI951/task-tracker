@@ -42,6 +42,8 @@ class AppTask {
   final bool uploadsComplete;
   final int uploadCompleted;
   final int uploadTotal;
+  final int uploadBytesSent;
+  final int uploadBytesTotal;
   final String? customer;
   final String? carOrThing;
   final String? presetId;
@@ -67,6 +69,8 @@ class AppTask {
     this.uploadsComplete = true,
     this.uploadCompleted = 0,
     this.uploadTotal = 0,
+    this.uploadBytesSent = 0,
+    this.uploadBytesTotal = 0,
     this.customer,
     this.carOrThing,
     this.presetId,
@@ -84,8 +88,13 @@ class AppTask {
   bool get isUploading => status == 'uploading';
 
   /// 0..1 upload progress; null when no upload is in flight.
+  /// Byte-based when the worker reported live byte counts (same numbers as
+  /// the progress notification), photo-count as fallback.
   double? get uploadProgress {
     if (!isUploading || uploadTotal <= 0) return null;
+    if (uploadBytesTotal > 0) {
+      return (uploadBytesSent / uploadBytesTotal).clamp(0.0, 1.0);
+    }
     return (uploadCompleted / uploadTotal).clamp(0.0, 1.0);
   }
 
@@ -107,6 +116,8 @@ class AppTask {
       uploadsComplete: map['uploadsComplete'] as bool? ?? true,
       uploadCompleted: map['uploadCompleted'] as int? ?? 0,
       uploadTotal: map['uploadTotal'] as int? ?? 0,
+      uploadBytesSent: map['uploadBytesSent'] as int? ?? 0,
+      uploadBytesTotal: map['uploadBytesTotal'] as int? ?? 0,
       customer: map['customer'] as String?,
       carOrThing: map['carOrThing'] as String?,
       presetId: map['presetId'] as String?,
@@ -137,6 +148,8 @@ class AppTask {
       'uploadsComplete': uploadsComplete,
       'uploadCompleted': uploadCompleted,
       'uploadTotal': uploadTotal,
+      'uploadBytesSent': uploadBytesSent,
+      'uploadBytesTotal': uploadBytesTotal,
       'customer': customer,
       'carOrThing': carOrThing,
       'presetId': presetId,
