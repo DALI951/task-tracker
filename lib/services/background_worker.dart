@@ -90,12 +90,16 @@ Future<bool> _runUploadTask(String sessionId) async {
   // Workmanager re-ran this task automatically (connectivity came back):
   // resume the SAME session — photos already uploaded keep their 'done'
   // flag, so only the remaining ones go up — and tell the employee.
-  if (session.status == 'failed') {
+  if (session.status == 'failed' || session.status == 'paused') {
     await UploadSessionService.write(
         session.copyWith(status: 'uploading', error: ''));
     final s = await _getSettings();
     await _showUploadResumed(session.notificationId, session, s);
   }
+
+  // A user-triggered pause (session file says paused): do nothing.
+  final afterResume = await UploadSessionService.read(sessionId);
+  if (afterResume == null || afterResume.status == 'paused') return true;
 
   try {
     await Firebase.initializeApp(
@@ -121,19 +125,27 @@ Future<bool> _runUploadTask(String sessionId) async {
       final photo = session.photos[i];
       if (photo.done) continue;
 
-      // The user may have pressed Stop while this worker ran.
+      // The user may have pressed Stop or Pause while this worker ran.
       final latest = await UploadSessionService.read(sessionId);
       if (latest == null ||
           latest.status == 'cancelled' ||
+          latest.status == 'paused' ||
           latest.finalApplied) {
         return true;
       }
 
       final path = '${sessionDir.path}/${photo.file}';
       if (!File(path).existsSync()) {
-        return !(await _markFailed(sessionId));
+        return !(await _markPaused(sessionId));
       }
       final bytes = File(path).readAsBytesSync();
+
+      // Keep the state file fresh so the app can tell a dead worker from a
+      // slow one (stale lastActivity -> auto-pause). Throttled: 15 s, and
+      // re-read before writing so a user Pause is never clobbered.
+      var lastActivityWrite = DateTime.now().millisecondsSinceEpoch;
+      await UploadSessionService.write(
+          latest.copyWith(lastActivity: lastActivityWrite));
 
       final url = await StorageService().uploadImageChunked(
         bytes,
@@ -141,6 +153,18 @@ Future<bool> _runUploadTask(String sessionId) async {
         onChunkProgress: (received, total) {
           doneBytes = session.bytesSent + received;
           final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - lastActivityWrite > 15000) {
+            lastActivityWrite = now;
+            unawaited(() async {
+              final fresh = await UploadSessionService.read(sessionId);
+              if (fresh != null &&
+                  fresh.status == 'uploading' &&
+                  !fresh.finalApplied) {
+                await UploadSessionService.write(
+                    fresh.copyWith(lastActivity: now));
+              }
+            }());
+          }
           if (now - lastByteNotify > 700) {
             lastByteNotify = now;
             unawaited(_showUploadProgress(
@@ -160,16 +184,16 @@ Future<bool> _runUploadTask(String sessionId) async {
                 file: photo.file, bytes: photo.bytes, url: url, done: true)
           else
             session.photos[j],
-      ]);
+      ], lastActivity: DateTime.now().millisecondsSinceEpoch);
       await UploadSessionService.write(updated);
 
       unawaited(_updateDocProgress(updated, done));
       await _showUploadProgress(notifId, updated, done, doneBytes, force: true);
     }
   } catch (e) {
-    // Network or server failure: mark the session 'failed' with a readable
-    // reason so the app can tell the employee and offer Retry. Photos that
-    // were already uploaded keep their 'done' flag, so Retry continues from
+    // Network or server failure: pause the session with a readable reason so
+    // the app can tell the employee and offer Resume. Photos that were
+    // already uploaded keep their 'done' flag, so Resuming continues from
     // where the upload stopped instead of starting over.
     final latest = await UploadSessionService.read(sessionId);
     if (latest == null ||
@@ -181,13 +205,13 @@ Future<bool> _runUploadTask(String sessionId) async {
     final reason = _uploadErrorReason(s, e);
     final retries = latest.retryCount + 1;
     await UploadSessionService.write(latest.copyWith(
-        status: 'failed', error: reason, retryCount: retries));
+        status: 'paused', error: reason, retryCount: retries));
     await _showUploadFailed(notifId, latest, reason, s);
     // Connectivity failures auto-retry: Workmanager waits for the network
-    // constraint, then re-runs this task (which resumes from 'failed' and
+    // constraint, then re-runs this task (which resumes from 'paused' and
     // fires the "Upload resumed" notification). Non-connectivity errors and
-    // attempts beyond the cap stop here — the in-app Retry button is the
-    // only way to continue then.
+    // attempts beyond the cap stop here — the in-app Resume/Retry button is
+    // the only way to continue then.
     final retryable = e is DioException &&
         (e.type == DioExceptionType.connectionError ||
             e.type == DioExceptionType.connectionTimeout ||
@@ -219,14 +243,14 @@ Future<bool> _runUploadTask(String sessionId) async {
   return true;
 }
 
-/// Marks a session failed and counts the attempt. Returns true when
-/// Workmanager should keep auto-retrying (used by the missing-file path).
-Future<bool> _markFailed(String sessionId) async {
+/// Pauses a session (missing file path) and counts the attempt. Returns true
+/// when Workmanager should keep auto-retrying.
+Future<bool> _markPaused(String sessionId) async {
   final session = await UploadSessionService.read(sessionId);
   if (session == null || session.status == 'cancelled') return true;
   final retries = session.retryCount + 1;
   await UploadSessionService.write(
-      session.copyWith(status: 'failed', retryCount: retries));
+      session.copyWith(status: 'paused', retryCount: retries));
   return retries <= maxUploadRetries;
 }
 

@@ -344,6 +344,12 @@ class SettingsService extends ChangeNotifier {
       'download_paused': 'Download paused — check your connection, then tap Retry',
       'notif_download_paused': 'Download paused',
       'notif_upload_resumed': 'Upload resumed',
+      'pause': 'Pause',
+      'resume': 'Resume',
+      'refresh': 'Refresh',
+      'upload_paused': 'Upload paused',
+      'upload_error_stuck': 'Upload stopped unexpectedly — tap Resume to continue',
+      'no_photos_uploaded': 'No photos uploaded yet',
     },
     'fr': {
       'app_name': 'Gestionnaire de Tâches',
@@ -577,6 +583,12 @@ class SettingsService extends ChangeNotifier {
       'download_paused': 'Téléchargement en pause — vérifiez votre connexion, puis appuyez sur Réessayer',
       'notif_download_paused': 'Téléchargement en pause',
       'notif_upload_resumed': 'Téléchargement repris',
+      'pause': 'Pause',
+      'resume': 'Reprendre',
+      'refresh': 'Actualiser',
+      'upload_paused': 'Téléchargement en pause',
+      'upload_error_stuck': 'Téléchargement arrêté de façon inattendue — appuyez sur Reprendre pour continuer',
+      'no_photos_uploaded': 'Aucune photo téléchargée pour le moment',
     },
     'ar': {
       'app_name': 'مدير المهام',
@@ -810,6 +822,12 @@ class SettingsService extends ChangeNotifier {
       'download_paused': 'توقف التحميل مؤقتاً — تحقق من اتصالك ثم اضغط إعادة المحاولة',
       'notif_download_paused': 'توقف التحميل مؤقتاً',
       'notif_upload_resumed': 'استؤنف الرفع',
+      'pause': 'إيقاف مؤقت',
+      'resume': 'استئناف',
+      'refresh': 'تحديث',
+      'upload_paused': 'الرفع متوقف مؤقتاً',
+      'upload_error_stuck': 'توقف الرفع فجأة — اضغط استئناف للمتابعة',
+      'no_photos_uploaded': 'لم يتم رفع أي صور بعد',
     },
   };
 

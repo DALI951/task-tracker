@@ -71,9 +71,10 @@ class UploadSession {
   final String historyAction;
   final String historyBy;
 
-  String status; // uploading | done | cancelled | failed
-  String error; // human-readable reason when status == 'failed' (localized)
+  String status; // uploading | paused | done | cancelled | failed
+  String error; // human-readable reason when status == 'paused'/'failed' (localized)
   int retryCount; // consecutive auto-retries Workmanager performed (capped)
+  int lastActivity; // ms epoch of the worker's last write; stale = worker died
   bool finalApplied;
   bool pendingApply;
   int bytesSent;
@@ -108,6 +109,7 @@ class UploadSession {
     this.status = 'uploading',
     this.error = '',
     this.retryCount = 0,
+    this.lastActivity = 0,
     this.finalApplied = false,
     this.pendingApply = false,
     this.bytesSent = 0,
@@ -147,6 +149,7 @@ class UploadSession {
         'status': status,
         'error': error,
         'retryCount': retryCount,
+        'lastActivity': lastActivity,
         'finalApplied': finalApplied,
         'pendingApply': pendingApply,
         'bytesSent': bytesSent,
@@ -184,6 +187,7 @@ class UploadSession {
         status: map['status'] as String? ?? 'uploading',
         error: map['error'] as String? ?? '',
         retryCount: map['retryCount'] as int? ?? 0,
+        lastActivity: map['lastActivity'] as int? ?? 0,
         finalApplied: map['finalApplied'] as bool? ?? false,
         pendingApply: map['pendingApply'] as bool? ?? false,
         bytesSent: map['bytesSent'] as int? ?? 0,
@@ -196,6 +200,7 @@ class UploadSession {
     String? status,
     String? error,
     int? retryCount,
+    int? lastActivity,
     bool? finalApplied,
     bool? pendingApply,
     int? bytesSent,
@@ -229,6 +234,7 @@ class UploadSession {
         status: status ?? this.status,
         error: error ?? this.error,
         retryCount: retryCount ?? this.retryCount,
+        lastActivity: lastActivity ?? this.lastActivity,
         finalApplied: finalApplied ?? this.finalApplied,
         pendingApply: pendingApply ?? this.pendingApply,
         bytesSent: bytesSent ?? this.bytesSent,

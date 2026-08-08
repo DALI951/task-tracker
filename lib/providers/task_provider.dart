@@ -83,6 +83,11 @@ class TaskProvider extends ChangeNotifier {
 
   Map<String, String> get sessionErrors => Map.unmodifiable(_sessionErrors);
 
+  /// docIds whose background upload is in the user- or auto-paused state.
+  final Set<String> _sessionPausedIds = {};
+
+  bool isUploadPaused(String docId) => _sessionPausedIds.contains(docId);
+
   bool _lastUploadCancelled = false;
   bool get lastUploadCancelled => _lastUploadCancelled;
 
@@ -831,6 +836,7 @@ class TaskProvider extends ChangeNotifier {
           _sessionOnByteProgress.remove(session.sessionId);
           _sessionOnStopped.remove(session.sessionId);
           _sessionErrors.remove(taskId);
+          _sessionPausedIds.remove(taskId);
           notifyListeners();
         }
       }());
@@ -849,6 +855,7 @@ class TaskProvider extends ChangeNotifier {
     await UploadSessionService.write(
         session.copyWith(status: 'uploading', error: '', retryCount: 0));
     _sessionErrors.remove(docId);
+    _sessionPausedIds.remove(docId);
     notifyListeners();
     try {
       await Workmanager().registerOneOffTask(
@@ -862,6 +869,77 @@ class TaskProvider extends ChangeNotifier {
     _startSessionPoller(session.sessionId);
   }
 
+  /// User taps Pause on an uploading problem/task: the worker is cancelled
+  /// and the session enters the paused state (Photos keep their 'done' flag;
+  /// Resume/Retry continues from where it stopped).
+  Future<void> pauseUpload(String docId, {required bool isProblem}) async {
+    final session = isProblem
+        ? await UploadSessionService.findByProblemId(docId)
+        : await UploadSessionService.findByTaskId(docId);
+    if (session == null || session.finalApplied) return;
+    if (session.status != 'uploading') return;
+    await UploadSessionService.write(session.copyWith(status: 'paused'));
+    _sessionPausedIds.add(docId);
+    _sessionErrors[docId] = _t('upload_paused');
+    _stopSessionPoller(session.sessionId);
+    try {
+      await Workmanager().cancelByUniqueName(session.uniqueName);
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  /// User taps Stop on a problem whose photos are still uploading: the
+  /// session is cancelled (no final flip, the report never reaches the
+  /// manager). Photos stay on the document for a future re-send.
+  Future<void> stopProblemUpload(String problemId) async {
+    final session = await UploadSessionService.findByProblemId(problemId);
+    if (session == null) return;
+    _stopSessionPoller(session.sessionId);
+    _sessionErrors.remove(problemId);
+    _sessionPausedIds.remove(problemId);
+    await UploadSessionService.markCancelled(session.sessionId);
+    try {
+      await Workmanager().cancelByUniqueName(session.uniqueName);
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  /// "Complete it" for an upload that got stuck or paused: applies the final
+  /// flip with the photos uploaded SO FAR (nothing is re-uploaded). Returns
+  /// an error message when no photo has been uploaded yet.
+  Future<String?> completeUploadNow(String docId,
+      {required bool isProblem}) async {
+    final session = isProblem
+        ? await UploadSessionService.findByProblemId(docId)
+        : await UploadSessionService.findByTaskId(docId);
+    if (session == null || session.finalApplied) return null;
+    _stopSessionPoller(session.sessionId);
+    try {
+      await Workmanager().cancelByUniqueName(session.uniqueName);
+    } catch (_) {}
+    final uploaded = session.photos.where((p) => p.done).length;
+    if (uploaded == 0) {
+      notifyListeners();
+      return _t('no_photos_uploaded');
+    }
+    final ok = await UploadFinalizer.apply(session);
+    if (ok) {
+      await UploadSessionService.write(session.copyWith(
+          status: 'done', finalApplied: true, pendingApply: false));
+      await UploadSessionService.delete(session.sessionId);
+      _sessionErrors.remove(docId);
+      _sessionPausedIds.remove(docId);
+      notifyListeners();
+      return null;
+    }
+    // Flip failed (auth restore etc.): mark done + pending so the startup
+    // sweep applies it later.
+    await UploadSessionService.write(session.copyWith(
+        status: 'done', pendingApply: true, finalApplied: false));
+    notifyListeners();
+    return _t('failed');
+  }
+
   /// Polls a background upload session's state file so in-app progress bars
   /// track the worker without a second upload. Fires the callbacks only when
   /// the numbers actually change. Stops when the session leaves 'uploading'.
@@ -870,12 +948,11 @@ class TaskProvider extends ChangeNotifier {
     _sessionPollers[sessionId] = Timer.periodic(
       const Duration(milliseconds: 600),
       (_) async {
-        final session = await UploadSessionService.read(sessionId);
+        var session = await UploadSessionService.read(sessionId);
         if (session == null) {
           _stopSessionPoller(sessionId);
           return;
-        }
-        final lastProgress = _sessionLastProgress[sessionId];
+        }        final lastProgress = _sessionLastProgress[sessionId];
         final done = session.completedPhotos;
         if (done != lastProgress) {
           _sessionLastProgress[sessionId] = done;
@@ -887,18 +964,40 @@ class TaskProvider extends ChangeNotifier {
           _sessionOnByteProgress[sessionId]
               ?.call(session.bytesSent, session.totalBytes);
         }
+        // A session stuck in 'uploading' with no worker activity for a while
+        // means the worker died (app killed, OS constraint, crash): auto-pause
+        // it so the card shows the paused state instead of a frozen progress
+        // bar, and the user can Resume/Complete.
+        if (session.status == 'uploading' &&
+            session.lastActivity > 0 &&
+            DateTime.now().millisecondsSinceEpoch - session.lastActivity >
+                3 * 60 * 1000) {
+          await UploadSessionService.write(session.copyWith(
+              status: 'paused', error: _t('upload_error_stuck')));
+          session = await UploadSessionService.read(sessionId);
+          if (session == null) {
+            _stopSessionPoller(sessionId);
+            return;
+          }
+        }
         if (session.status != 'uploading') {
           _stopSessionPoller(sessionId);
           _sessionOnProgress.remove(sessionId);
           _sessionOnByteProgress.remove(sessionId);
           final onStopped = _sessionOnStopped.remove(sessionId);
-          if (session.status == 'failed') {
+          if (session.status == 'paused' || session.status == 'failed') {
+            if (session.status == 'paused') {
+              _sessionPausedIds.add(session.docId);
+            }
             _sessionErrors[session.docId] = session.error.isEmpty
-                ? '${_t('upload_error_generic')}'
+                ? (session.status == 'paused'
+                    ? _t('upload_paused')
+                    : _t('upload_error_generic'))
                 : session.error;
             onStopped?.call(_sessionErrors[session.docId]!);
           } else {
             _sessionErrors.remove(session.docId);
+            _sessionPausedIds.remove(session.docId);
           }
           notifyListeners();
           if (session.finalApplied) {
@@ -933,14 +1032,20 @@ class TaskProvider extends ChangeNotifier {
         if (ok) await UploadSessionService.delete(session.sessionId);
         continue;
       }
-      if (session.status == 'uploading' || session.status == 'failed') {
+      if (session.status == 'uploading' ||
+          session.status == 'failed' ||
+          session.status == 'paused') {
         try {
+          // replace, NOT keep: a work task that already ran to completion is
+          // "finished" for Workmanager, and keep would be a no-op — the
+          // upload would stay stuck forever. replace forces a fresh run that
+          // resumes from the photos already uploaded.
           await Workmanager().registerOneOffTask(
             session.uniqueName,
             uploadTaskName,
             inputData: {'sessionId': session.sessionId},
             constraints: Constraints(networkType: NetworkType.connected),
-            existingWorkPolicy: ExistingWorkPolicy.keep,
+            existingWorkPolicy: ExistingWorkPolicy.replace,
           );
         } catch (_) {}
       }

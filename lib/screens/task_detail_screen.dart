@@ -168,6 +168,18 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (mounted) toast(context, t('upload_stopped'));
   }
 
+  /// Completes the task with whatever photos were uploaded so far (nothing
+  /// is re-uploaded); used when an upload is paused/stuck and the employee
+  /// just wants it submitted.
+  Future<void> _completeUploadNow(BuildContext context) async {
+    final err = await context
+        .read<TaskProvider>()
+        .completeUploadNow(widget.task.id, isProblem: false);
+    if (context.mounted && err != null) {
+      toast(context, err, error: true);
+    }
+  }
+
   Future<void> _rejectWithReason() async {
     final reasonCtrl = TextEditingController();
     final reason = await showDialog<String>(
@@ -376,8 +388,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     // If the background upload stopped (no internet, timeout, server error),
     // surface the reason + Retry. Retry re-uses the same session, so photos
     // already uploaded are not re-uploaded.
-    final uploadStoppedReason =
-        context.watch<TaskProvider>().sessionErrors[task.id];
+    final taskProvider = context.watch<TaskProvider>();
+    final uploadStoppedReason = taskProvider.sessionErrors[task.id];
+    final isTaskPaused = taskProvider.isUploadPaused(task.id);
 
     // Smooth local byte progress while this screen is submitting; the
     // document's per-photo counters otherwise (task card, other device).
@@ -583,11 +596,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      const Icon(Icons.error_outline, size: 20, color: Brand.problem),
+                      Icon(
+                        isTaskPaused
+                            ? Icons.pause_circle_outline
+                            : Icons.error_outline,
+                        size: 20,
+                        color: Brand.problem,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '${t('upload_stopped_title')}: $uploadStoppedReason',
+                          '${isTaskPaused ? t('upload_paused') : t('upload_stopped_title')}: $uploadStoppedReason',
                           style: TextStyle(fontSize: 13, color: cs.onSurface),
                         ),
                       ),
@@ -596,10 +615,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () =>
-                            context.read<TaskProvider>().retryUpload(task.id, isProblem: false),
-                        icon: const Icon(Icons.refresh),
-                        label: Text(t('retry')),
+                        onPressed: () => context
+                            .read<TaskProvider>()
+                            .retryUpload(task.id, isProblem: false),
+                        icon: Icon(isTaskPaused
+                            ? Icons.play_arrow
+                            : Icons.refresh),
+                        label: Text(isTaskPaused ? t('resume') : t('retry')),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _completeUploadNow(context),
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: Text(t('complete')),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -658,13 +689,36 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                     ),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _stopUpload,
-                        icon: const Icon(Icons.stop_circle_outlined),
-                        label: Text(t('stop_upload')),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => context
+                                .read<TaskProvider>()
+                                .pauseUpload(task.id, isProblem: false),
+                            icon: const Icon(Icons.pause),
+                            label: Text(t('pause')),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => context
+                                .read<TaskProvider>()
+                                .retryUpload(task.id, isProblem: false),
+                            icon: const Icon(Icons.refresh),
+                            label: Text(t('refresh')),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _stopUpload,
+                            icon: const Icon(Icons.stop_circle_outlined),
+                            label: Text(t('stop_upload')),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

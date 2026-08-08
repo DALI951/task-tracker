@@ -261,13 +261,14 @@ class _ReportStatusCard extends StatelessWidget {
     Color fg;
     IconData icon;
     String label;
-    final uploadStoppedReason =
-        context.watch<TaskProvider>().sessionErrors[problem.id];
+    final provider = context.watch<TaskProvider>();
+    final uploadStoppedReason = provider.sessionErrors[problem.id];
+    final paused = provider.isUploadPaused(problem.id);
     final uploading = problem.isUploading && !problem.uploadsComplete;
     if (uploadStoppedReason != null) {
       fg = Brand.problem;
-      icon = Icons.error_outline;
-      label = t('interrupted');
+      icon = paused ? Icons.pause_circle_outline : Icons.error_outline;
+      label = paused ? t('upload_paused') : t('interrupted');
     } else if (uploading) {
       fg = Colors.blue.shade700;
       icon = Icons.cloud_upload;
@@ -337,15 +338,23 @@ class _ReportStatusCard extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: Brand.problem),
                 ),
                 const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => context
-                        .read<TaskProvider>()
-                        .retryUpload(problem.id, isProblem: true),
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: Text(t('retry')),
-                  ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _CardButton(
+                      icon: paused ? Icons.play_arrow : Icons.refresh,
+                      label: paused ? t('resume') : t('retry'),
+                      primary: true,
+                      onPressed: () => provider.retryUpload(problem.id,
+                          isProblem: true),
+                    ),
+                    _CardButton(
+                      icon: Icons.check_circle_outline,
+                      label: t('complete'),
+                      onPressed: () => _completeNow(context),
+                    ),
+                  ],
                 ),
               ],
               if (uploading) ...[
@@ -357,6 +366,38 @@ class _ReportStatusCard extends StatelessWidget {
                     minHeight: 5,
                     backgroundColor: cs.surfaceContainerHighest,
                   ),
+                ),
+                const SizedBox(height: 10),
+                // The upload runs in the background; these controls force
+                // the worker to refresh (resume from done photos), pause it,
+                // stop it, or complete it with what is already uploaded.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _CardButton(
+                      icon: Icons.refresh,
+                      label: t('refresh'),
+                      onPressed: () => provider.retryUpload(problem.id,
+                          isProblem: true),
+                    ),
+                    _CardButton(
+                      icon: Icons.pause,
+                      label: t('pause'),
+                      onPressed: () => provider.pauseUpload(problem.id,
+                          isProblem: true),
+                    ),
+                    _CardButton(
+                      icon: Icons.stop,
+                      label: t('stop_upload'),
+                      onPressed: () => provider.stopProblemUpload(problem.id),
+                    ),
+                    _CardButton(
+                      icon: Icons.check_circle_outline,
+                      label: t('complete'),
+                      onPressed: () => _completeNow(context),
+                    ),
+                  ],
                 ),
               ],
               if (problem.photoUrls.isNotEmpty) ...[
@@ -383,6 +424,15 @@ class _ReportStatusCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _completeNow(BuildContext context) async {
+    final err = await context
+        .read<TaskProvider>()
+        .completeUploadNow(problem.id, isProblem: true);
+    if (context.mounted && err != null) {
+      toast(context, err, error: true);
+    }
   }
 
   void _showDetails(BuildContext context) {
@@ -450,6 +500,41 @@ class _ReportStatusCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Compact outlined action button used in the report card's upload controls.
+class _CardButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final bool primary;
+
+  const _CardButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.primary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = primary
+        ? OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Brand.done,
+            side: BorderSide(color: Brand.done),
+            visualDensity: VisualDensity.compact,
+          )
+        : OutlinedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+          );
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      style: style,
+      icon: Icon(icon, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 }
