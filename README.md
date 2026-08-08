@@ -120,7 +120,7 @@ flutter run -d windows --release
 
 ### 4. Create Accounts
 
-- **Self-signup (public):** create an employee account at the [Registration Website](https://dali951.github.io/task-tracker-admin/register.html)
+- **Registration website:** create a manager account at the [Registration Website](http://modali.powerpme.com/tasktracker/) → enter passphrase `tasktracker2024`
 - **Admin panel:** the [Admin Panel](https://dali951.github.io/task-tracker-admin/) → enter passphrase `tasktracker2024` → create manager/employee accounts
 
 ---
