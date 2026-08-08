@@ -120,7 +120,8 @@ flutter run -d windows --release
 
 ### 4. Create Accounts
 
-Open the [Admin Panel](https://dali951.github.io/task-tracker/admin/index.html) → enter passphrase `tasktracker2024` → create manager/employee accounts.
+- **Self-signup (public):** create an employee account at the [Registration Website](https://dali951.github.io/task-tracker-admin/register.html)
+- **Admin panel:** the [Admin Panel](https://dali951.github.io/task-tracker-admin/) → enter passphrase `tasktracker2024` → create manager/employee accounts
 
 ---
 
